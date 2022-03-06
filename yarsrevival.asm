@@ -329,13 +329,14 @@ animate_sprites:
     sty YARS_CURRENT_FRAME
 move_sprites:
     ;Set Yar's position on the screen
-    jsr process_sprite_horizontal_movemement
-    lda YARS_Y_COORDINATE
+    jsr process_sprite_horizontal_movemement    ; Put YAR into the correct x position on the screen
+    lda YARS_Y_COORDINATE                       ; Put Yar into the correct y position on the screen
     sta SPRITE_0_Y_COOR
     ;Calculate YARS Screen Character Position
-    ;jsr Calculate_YARS_Character_Position
+    jsr Calculate_YARS_Character_Position       ; Calculate where on the screen YAR is (text x,y value)
 :finish_sprite
     jmp Do_User_Commands
+
 
 
  
