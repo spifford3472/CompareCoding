@@ -118,6 +118,7 @@
     YARS_CURRENT_FRAME                  = $310E     ; Current YAR animation frame
     YARS_MAX_FRAME_OFFSET               = $310F     ; Number of animation frames used for YAR
     YARS_SPRITE_POINTER                 = $07f8     ; VICII Chip memory location to store the current animation frame
+    QOTILE_SPRITE_POINTER               = $07f9     ; VICII Chip memory location to store Qotile
     YARS_X_COORDINATE                   = $3115     ; Memory location to store YAR'S X-coordinate on screen
     YARS_Y_COORDINATE                   = $3116     ; Memory location to store YAR'S Y-coordinate on screen
     SPRITE_0_X_COOR                     = $d000     ; VICII memory location to update YARs actual x screen position
@@ -239,11 +240,13 @@ Calculate_YARS_Character_Position:
     ;   Sprite 0 - Yar
     ;**************************
 Initialize_Sprites:
-    ;Set Sprite Pointers    (Sprites are $40 bytes, offset $C5 means sprite at $40*$C5=$3140)
+    ;Set YARs Sprite Pointers    (Sprites are $40 bytes, offset $C5 means sprite at $40*$C5=$3140)
     lda YARS_ANIMATION_BASE                     ; Load Yar's sprite memory offset (NOTE: this is $C5 in the above calculation)
     sta YARS_SPRITE_POINTER                     ; Store the sprite memory offset for Yar
+    lda #$cd                                    ; Load Qotiles sprite memory offset
+    sta QOTILE_SPRITE_POINTER                   ; Store the sprite memory offset for Qotile
     ;Turn on Sprites
-    lda #$01                                    ; Set which sprites to enable on the screen 1=sprite zero
+    lda #$03                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
     sta $d015                                   ; Tell the VICII chip which sprites to enable
     ;Set Yar's position on the screen
     jsr process_sprite_horizontal_movemement
@@ -987,32 +990,32 @@ render_complete:
 ; ===========================================
 ; Sprite's for Yar's animation
 ; ===========================================
-; Yar - Image #1 
+; Yar - Image #1 - Offset: $c5
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 !byte $30,$00,$00,$0c,$00,$00,$c3,$02,$00,$c0,$c4,$00,$ff,$38,$00,$ff
 !byte $38,$00,$ff,$38,$00,$ff,$38,$00,$c0,$c4,$00,$c3,$02,$00,$0c,$00
 !byte $00,$30,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #2 
+; Yar - Image #2 - Offset: $c6
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00
 !byte $18,$00,$00,$86,$00,$00,$c1,$02,$00,$c0,$c4,$00,$ff,$38,$00,$7f
 !byte $38,$00,$7f,$38,$00,$ff,$38,$00,$c0,$c4,$00,$c1,$02,$00,$86,$00
 !byte $00,$18,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #3 
+; Yar - Image #3 - Offset: $c7
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00,$18,$00,$00
 !byte $44,$00,$00,$43,$00,$00,$60,$82,$00,$60,$c4,$00,$7f,$38,$00,$3f
 !byte $38,$00,$3f,$38,$00,$7f,$38,$00,$60,$c4,$00,$60,$82,$00,$43,$00
 !byte $00,$46,$00,$00,$18,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #4
+; Yar - Image #4 - Offset: $c8
 !byte $00,$00,$00,$00,$00,$00,$00,$08,$00,$00,$04,$00,$00,$02,$00,$01
 !byte $c1,$00,$00,$61,$00,$00,$20,$82,$00,$20,$c4,$00,$3f,$38,$00,$1f
 !byte $38,$00,$1f,$38,$00,$3f,$38,$00,$20,$c4,$00,$20,$82,$00,$61,$00
 !byte $01,$c3,$00,$00,$02,$00,$00,$04,$00,$00,$08,$00,$00,$00,$00,$01
-; Yar - Image #5 
+; Yar - Image #5 - Offset: $c9
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00,$18,$00,$00
 !byte $44,$00,$00,$43,$00,$00,$60,$82,$00,$60,$c4,$00,$7f,$38,$00,$3f
 !byte $38,$00,$3f,$38,$00,$7f,$38,$00,$60,$c4,$00,$60,$82,$00,$43,$00
 !byte $00,$46,$00,$00,$18,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #6 
+; Yar - Image #6 - Offset: $ca
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00
 !byte $18,$00,$00,$86,$00,$00,$c1,$02,$00,$c0,$c4,$00,$ff,$38,$00,$7f
 !byte $38,$00,$7f,$38,$00,$ff,$38,$00,$c0,$c4,$00,$c1,$02,$00,$86,$00
@@ -1020,7 +1023,7 @@ render_complete:
 ; ===========================================
 ; Sprite for Yar's bullet
 ; ===========================================
-; Yar - Bullet 
+; Yar - Bullet - Offset: $cb
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 !byte $07,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
@@ -1028,7 +1031,7 @@ render_complete:
 ; ===========================================
 ; Sprite for Qotile's missle
 ; ===========================================
-; Qotile - Guided Missle 
+; Qotile - Guided Missle - Offset: $cc
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$fe,$00,$00,$fe,$00
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
@@ -1036,7 +1039,7 @@ render_complete:
 ; ===========================================
 ; Sprite for Qotile 
 ; ===========================================
-; Qotile 
+; Qotile - Offset: $cd
 !byte $00,$00,$0c,$00,$00,$1c,$00,$00,$3c,$00,$00,$6c,$00,$00,$cc,$00
 !byte $01,$8c,$00,$03,$0c,$00,$06,$0c,$00,$1c,$0c,$00,$70,$0c,$00,$7f
 !byte $fc,$00,$70,$0c,$00,$1c,$0c,$00,$06,$0c,$00,$03,$0c,$00,$01,$8c
@@ -1044,27 +1047,27 @@ render_complete:
 ; ===========================================
 ; Sprite's for Qotile's Swirl animation
 ; ===========================================
-; Qotile Swirl - Image #1 
+; Qotile Swirl - Image #1 - Offset: $ce
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$10,$00,$00
 !byte $20,$00,$00,$40,$00,$00,$40,$00,$00,$43,$80,$00,$3c,$40,$00,$3c
 !byte $20,$04,$3c,$00,$02,$3c,$00,$01,$c2,$00,$00,$02,$00,$00,$02,$00
 !byte $00,$04,$00,$00,$08,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #2 
+; Qotile Swirl - Image #2  - Offset: $cf
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$08,$00,$00
 !byte $10,$00,$00,$20,$00,$00,$20,$00,$00,$20,$00,$00,$3f,$80,$04,$3c
 !byte $40,$02,$3c,$20,$01,$fc,$00,$00,$04,$00,$00,$04,$00,$00,$04,$00
 !byte $00,$08,$00,$00,$10,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #3 
+; Qotile Swirl - Image #3 - Offset: $d0
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$04,$00,$00
 !byte $08,$00,$00,$10,$00,$00,$10,$00,$00,$10,$00,$04,$18,$00,$02,$3f
 !byte $80,$01,$fc,$40,$00,$18,$20,$00,$08,$00,$00,$08,$00,$00,$08,$00
 !byte $00,$10,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #4 
+; Qotile Swirl - Image #4 - Offset: $d1
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$02,$00,$00
 !byte $04,$00,$00,$08,$00,$00,$08,$00,$04,$08,$00,$02,$18,$00,$01,$fc
 !byte $00,$00,$3f,$80,$00,$18,$40,$00,$10,$20,$00,$10,$00,$00,$10,$00
 !byte $00,$20,$00,$00,$40,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #4 
+; Qotile Swirl - Image #4 - Offset: $d2
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 !byte $01,$80,$02,$02,$00,$02,$04,$00,$01,$04,$00,$00,$fc,$00,$00,$3c
 !byte $00,$00,$3c,$00,$00,$3f,$00,$00,$20,$80,$00,$20,$40,$00,$40,$40
