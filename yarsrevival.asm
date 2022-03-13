@@ -110,7 +110,9 @@
     USER_INPUT_COUNTER                  = $311A     ; The number of screen interupts that have occurred since the last user update
     USER_INPUT_TRIGGER                  = $311B     ; The number of screen interupts to occur before updating the user input
     YARS_MOVEMENT_SPEED                 = $03       ; Controls many pixels YAR moves with each user input
-  
+    SHIELD_BUMP                         = $3120     ; Shield Bump in Progress (0=No 1=Yes)
+    BUMP_DISTANCE_LEFT                  = $3121     ; Distance remaining on the shield bump
+
     ;**************************
     ; SPRITE VALUES
     ;**************************
@@ -124,6 +126,7 @@
     SPRITE_0_X_COOR                     = $d000     ; VICII memory location to update YARs actual x screen position
     SPRITE_0_Y_COOR                     = $d001     ; VICII memory location to update YARs actual y screen position
     SPRITE_0_COLOR                      = $d027     ; VICII memory location to store YAR's color
+    SPRITE_1_COLOR                      = $d028     ; VICII memory location to store QOTILE's color
     SPRITE_MODE                         = $d01c     ; VICII memory location to denote each sprites HI-RES or MULTICOLOR value
     SPRITE_X_MSB_LOCATION               = $D010     ; VICII memory location for sprite horizontal 9th bit
     SPRITE_MAX_X_COORDINATE             = $30D4     ; Since we move sprites in 2 pixel steps, we limit the x-coordinate
@@ -132,6 +135,11 @@
     JOYSTICK_FIRE                       = $3119     ; Players Fire Input Value
     YARS_SCREEN_POSITION_Y              = $311C     ; YARS screen text position - Y
     YARS_SCREEN_POSITION_X              = $311D     ; YARS screen text position - X
+    QOTILE_X_COORDINATE                 = $311E     ; Memory location to Qotile's X-coordinate on screen
+    QOTILE_Y_COORDINATE                 = $311F     ; Memory location to Qotile's Y-coordinate on screen
+    SPRITE_1_X_COOR                     = $d002     ; VICII memory location to update QOTILE's actual x screen position
+    SPRITE_1_Y_COOR                     = $d003     ; VICII memory location to update QOTILE's actual y screen position
+    SPRITE_BACKGROUND_COLLISIONS        = $d01f     ; VICII register to record sprite to background collisions
 
     ;**************************
     ; System Color CONSTANTS
@@ -152,7 +160,7 @@
     LIGHTGREEN          = $0d
     LIGHTBLUE           = $0e
     LIGHTGRAY           = $0f
-
+ 
 ;===================================================================
 ; Main Game Code
 ;===================================================================
@@ -249,15 +257,28 @@ Initialize_Sprites:
     lda #$03                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
     sta $d015                                   ; Tell the VICII chip which sprites to enable
     ;Set Yar's position on the screen
-    jsr process_sprite_horizontal_movemement
-    lda YARS_Y_COORDINATE
-    sta SPRITE_0_Y_COOR
-    ;Set Yar's color
-    lda WHITE
-    sta SPRITE_0_COLOR
+    jsr process_sprite_horizontal_movemement    ; Process YARs X-Coor
+    lda YARS_Y_COORDINATE                       ; Load YARs y-coord into .A
+    sta SPRITE_0_Y_COOR                         ; Set y-coor for Yar
+    ;Set Yar's and Qotile's color
+    lda WHITE                                   ; Load the white color into .A
+    sta SPRITE_0_COLOR                          ; Set YARs color
+    sta SPRITE_1_COLOR                          ; Set Qotile's color
     ;Set Yar to HiRes
-    lda #0
-    sta SPRITE_MODE
+    lda #0                                      ; load Hires value to .A
+    sta SPRITE_MODE                             ; Store .A into sprite mode
+    ;Set Qotile's initial position
+    lda QOTILE_Y_COORDINATE                     ; Load Qotiles Y coordinste into .A
+    sta SPRITE_1_Y_COOR                         ; Store y-coordinate for Qotile
+    ;Set Qotiles X coordinate using 9th bit
+    lda QOTILE_X_COORDINATE                     ; Load YAR'S x-coordinate
+    asl                                         ; double the coordinate
+    sta SPRITE_1_X_COOR
+    ;Set Yar's 9th bit for x position
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00000010                              ; Use bit-wise OR to set the bit for sprite 1
+    jmp complete_horizontal_movement
+    sta SPRITE_X_MSB_LOCATION    
     rts
 
 
@@ -292,6 +313,87 @@ moveup1:
     sty SHIELD_DISPLAY_LINE_START               ; Store the new start position in memory
     rts
 
+    ;***********************************************
+    ; Calculate where Qotile should be on the y axis
+    ;***********************************************
+Calculate_Qotile_Position:
+    ldx SHIELD_DIRECTION                        ; Load the direction the shield should be moving
+    cpx #1                                      ; Check if up or down
+    bne qotile_moveup
+    lda QOTILE_Y_COORDINATE                     ; Load Qotile's current Y location
+    clc                                         ; Clear the carry flag
+    adc #$08                                    ; Add 8 pixels to the y coordinate for Qotile
+    sta QOTILE_Y_COORDINATE                     ; Store Qotile's updated y coordinate
+    jmp move_qotile
+qotile_moveup:
+    lda QOTILE_Y_COORDINATE                     ; Load .A with Qotiles current Y coordinate
+    sec                                         ; Set carry flag for subtraction
+    sbc #$08                                    ; Reduce Qotile's y-coor by 8 pixels
+    sta QOTILE_Y_COORDINATE
+move_qotile:
+    lda QOTILE_Y_COORDINATE                     ; Qotile only moves in the y axis, so 
+    sta SPRITE_1_Y_COOR                         ; no need to update X coordinate    
+    rts
+
+
+    ;************************************************************
+    ; Detect Yar impact with background
+    ; If impact detected then shoot Yar behind the neutral line
+    ; Can I add a bit of fancy movement to show the hit
+    ; Maybe play some kind of weird shield sound effect
+    ;************************************************************
+DetectYarBackgroundHit:
+    ; Yar can only impact Qotile's shield if Yar's 9th Sprite bit is set
+    ; and can only hit the neutral zone if the 9th bit is not set
+    ; NOTE: There is no 9th bit instead a new byte needs to be checked SPRITE_X_MSB_LOCATION
+    lda SPRITE_X_MSB_LOCATION                   ; Load the 9th bit sprite register
+    and #%00000001                              ; use bitwise AND to zero all but Yar's bit
+    beq checkNeutralZoneHit                     ; the zero flag is not set 
+check_shield_hit:
+    lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
+    and #%00000001                              ; Use bitwise AND to see if Yar is involved in a collision
+    beq finishBackgroundHit                     ; if zero flags not et then no collision
+    ; Simple test to turn border yellow if hit
+    ;lda #YELLOW
+    ;sta BORDER_COLOR
+    lda #$01                                    ; Load .A with an "On" value (1)
+    sta SHIELD_BUMP                             ; Turn on shield Bump
+    lda $0f                                     ; Load .A with the bump distance
+    sta BUMP_DISTANCE_LEFT
+    rts 
+checkNeutralZoneHit:   
+    lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
+    and #%00000001                              ; Use bitwise AND to see if Yar is involved in a collision
+    beq finishBackgroundHit                     ; if zero flags not et then no collision
+    ; Simple test to turn border yellow if hit
+    lda #RED
+    sta BORDER_COLOR
+    rts                              
+finishBackgroundHit:
+    lda #BLUE
+    sta BORDER_COLOR
+    rts 
+    
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+;************************************************
+; Create a variable to determine if a shield bump is in progress (SHIELD_BUMP=$3120)
+; once shield bump is set in progress, set a countdown variable to move yar to the left
+; for each interupt, bump yar to the left (BUMP_DISTANCE=$3121)
+; once countdown variable hits zero then turn off bump variable and reset the countdown variable
+;************************************************
+;************************************************
+
+
+
     ;****************************************************************
     ; ProcessIRQ
     ;   Determine if anything needs executed when the interrupt fires
@@ -315,6 +417,8 @@ Do_User_Commands:
     jsr Move_The_Player
     jmp complete_irq
 action_screen:
+    ;Set Qotile's position on the screen
+    jsr Calculate_Qotile_Position
     jsr Do_Screen_Animation                     ; Translate the PETSCII screen changes onto the screen
     jmp check_sprite_animation                  ; Jump back to check the sprites
 animate_sprites:                                
@@ -339,10 +443,6 @@ move_sprites:
     jsr Calculate_YARS_Character_Position       ; Calculate where on the screen YAR is (text x,y value)
 :finish_sprite
     jmp Do_User_Commands
-
-
-
- 
 
 
     ;*****************************************************
@@ -408,8 +508,25 @@ Move_The_Player:
 ; if value is 0 then the user is doing something
 ;===================================================================
 Process_User_Input:
+    lda SHIELD_BUMP                             ; Load .Y with the current Shield bump value
+    beq Start_Joystick_Read                     ; If Yar has not bumped Qotile's shield then allow movement
+    ldy BUMP_DISTANCE_LEFT                      ; Load current bump distance
+    cpy #$00
+    beq ResetShieldBump
+    lda #YELLOW
+    sta BORDER_COLOR
+    jmp process_left
+ResetShieldBump:
+    lda #WHITE
+    sta BORDER_COLOR
+    ldx #$0f                                    ; Reset Bump Distance
+    stx BUMP_DISTANCE_LEFT
+    ldx #$00
+    stx SHIELD_BUMP 
+    rts
+Start_Joystick_Read:
     jsr get_joystick_command                    ; Get user input
-    bcs process_user_movement                   ; If fore button not pressed process any movement
+    bcs process_user_movement                   ; If fire button not pressed process any movement
     nop                                         ; PROCESS FIRE BUTTON BEING PUSHED
 process_user_movement:
     lda JOYSTICK_X                              ; Load the users joystick x-coordinate request
@@ -464,6 +581,7 @@ do_the_move_up:
     sbc #YARS_MOVEMENT_SPEED                    ; Move YAR up by denoted speed
     sta YARS_Y_COORDINATE                       ; Store new y-coord
 complete_user_input:
+    jsr DetectYarBackgroundHit
     rts                                         ; Return to calling procedure
 
 
@@ -580,6 +698,9 @@ irq:
     iny                             ; Increase the User Input counter
     sty USER_INPUT_COUNTER          ; Store the user Input counter
     jsr ProcessIRQ
+    ;clear sprite to background collision flag to clear erronous hits
+    ;register holds value till it is read
+    lda SPRITE_BACKGROUND_COLLISIONS
     pla             ; Restore Y register from stack (Remeber stack is LIFO: Last In First Out)
     tay             ; Transfer .A to .Y
     pla             ; Restore X register from stack
@@ -984,6 +1105,9 @@ render_complete:
 !byte $02                           ; User input interupt action trigger [Memory: $311B]
 !byte $00                           ; YARS screen y-coordinate (PETSCII) [Memory: $311C]
 !byte $00                           ; YARS screen x-coordinate (PETSCII) [Memory: $311D]
+!byte $1e, $81                      ; Qotile's x & y coordinates [Memory: $311E, $311F]
+!byte $00                           ; Shield Bump variable [Memory: $3120]
+!byte $0f                           ; Bump Distance [Memory: $3121]
 
 *=$3140
 ; SPRITE IMAGE DATA : 14 images : total size is 896 ($380) bytes.
