@@ -112,6 +112,7 @@
     YARS_MOVEMENT_SPEED                 = $03       ; Controls many pixels YAR moves with each user input
     SHIELD_BUMP                         = $3120     ; Shield Bump in Progress (0=No 1=Yes)
     BUMP_DISTANCE_LEFT                  = $3121     ; Distance remaining on the shield bump
+    BUMP_DISTANCE_SETTING               = $08       ; Distance for bump to move left
 
     ;**************************
     ; SPRITE VALUES
@@ -177,6 +178,8 @@ InitializeGame:
     lda #BLUE
     sta BORDER_COLOR
     jsr CLRHOM                      ; Kernal routine to clear the screen
+    lda #$0f 
+    sta BUMP_DISTANCE_LEFT
     ;Setup the screen
     jsr Draw_The_Shield             ; Draw the shield
     jsr Draw_Neutral_Zone           ; Draw the Neutral Zone
@@ -356,10 +359,11 @@ check_shield_hit:
     ; Simple test to turn border yellow if hit
     ;lda #YELLOW
     ;sta BORDER_COLOR
+    lda SHIELD_BUMP                             ; Load .A with current Shield bump value
+    bne complete_bump_setup                     ; If bump is already started then return else set the value
     lda #$01                                    ; Load .A with an "On" value (1)
     sta SHIELD_BUMP                             ; Turn on shield Bump
-    lda $0f                                     ; Load .A with the bump distance
-    sta BUMP_DISTANCE_LEFT
+complete_bump_setup:
     rts 
 checkNeutralZoneHit:   
     lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
@@ -374,25 +378,6 @@ finishBackgroundHit:
     sta BORDER_COLOR
     rts 
     
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-;************************************************
-; Create a variable to determine if a shield bump is in progress (SHIELD_BUMP=$3120)
-; once shield bump is set in progress, set a countdown variable to move yar to the left
-; for each interupt, bump yar to the left (BUMP_DISTANCE=$3121)
-; once countdown variable hits zero then turn off bump variable and reset the countdown variable
-;************************************************
-;************************************************
-
-
 
     ;****************************************************************
     ; ProcessIRQ
@@ -510,18 +495,15 @@ Move_The_Player:
 Process_User_Input:
     lda SHIELD_BUMP                             ; Load .Y with the current Shield bump value
     beq Start_Joystick_Read                     ; If Yar has not bumped Qotile's shield then allow movement
-    ldy BUMP_DISTANCE_LEFT                      ; Load current bump distance
-    cpy #$00
-    beq ResetShieldBump
-    lda #YELLOW
-    sta BORDER_COLOR
-    jmp process_left
+    ldx BUMP_DISTANCE_LEFT                      ; Load current bump distance into .X
+    beq ResetShieldBump                         ; If no more bump movement reset the bump flag
+    dex                                         ; Decrement .X
+    stx BUMP_DISTANCE_LEFT                      ; Store the .X into the bump distance
+    jmp process_left                            ; Move Yar to the left
 ResetShieldBump:
-    lda #WHITE
-    sta BORDER_COLOR
-    ldx #$0f                                    ; Reset Bump Distance
-    stx BUMP_DISTANCE_LEFT
-    ldx #$00
+    ldx #BUMP_DISTANCE_SETTING                  ; Load the bump distance to travel setting into .X
+    stx BUMP_DISTANCE_LEFT                      ; Store .X in memory (Reset distance to bump)
+    ldx #$00                                    ; Reset the bump indicator floag
     stx SHIELD_BUMP 
     rts
 Start_Joystick_Read:
