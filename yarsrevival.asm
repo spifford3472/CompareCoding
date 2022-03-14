@@ -122,12 +122,14 @@
     YARS_MAX_FRAME_OFFSET               = $310F     ; Number of animation frames used for YAR
     YARS_SPRITE_POINTER                 = $07f8     ; VICII Chip memory location to store the current animation frame
     QOTILE_SPRITE_POINTER               = $07f9     ; VICII Chip memory location to store Qotile
+    BULLET_SPRITE_POINTER               = $07fa     ; VICII Chip memory location to store YAR's BULLET
     YARS_X_COORDINATE                   = $3115     ; Memory location to store YAR'S X-coordinate on screen
     YARS_Y_COORDINATE                   = $3116     ; Memory location to store YAR'S Y-coordinate on screen
     SPRITE_0_X_COOR                     = $d000     ; VICII memory location to update YARs actual x screen position
     SPRITE_0_Y_COOR                     = $d001     ; VICII memory location to update YARs actual y screen position
     SPRITE_0_COLOR                      = $d027     ; VICII memory location to store YAR's color
     SPRITE_1_COLOR                      = $d028     ; VICII memory location to store QOTILE's color
+    SPRITE_2_COLOR                      = $d029     ; VICII memory location to store YAR's bullet color
     SPRITE_MODE                         = $d01c     ; VICII memory location to denote each sprites HI-RES or MULTICOLOR value
     SPRITE_X_MSB_LOCATION               = $D010     ; VICII memory location for sprite horizontal 9th bit
     SPRITE_MAX_X_COORDINATE             = $30D4     ; Since we move sprites in 2 pixel steps, we limit the x-coordinate
@@ -138,8 +140,12 @@
     YARS_SCREEN_POSITION_X              = $311D     ; YARS screen text position - X
     QOTILE_X_COORDINATE                 = $311E     ; Memory location to Qotile's X-coordinate on screen
     QOTILE_Y_COORDINATE                 = $311F     ; Memory location to Qotile's Y-coordinate on screen
+    BULLET_X_COORDINATE                 = $3122     ; Memory location to store YAR's bullet actual x screen position
+    BULLET_Y_COORDINATE                 = $3123     ; Memory location to store YAR's bullet actual y screen position
     SPRITE_1_X_COOR                     = $d002     ; VICII memory location to update QOTILE's actual x screen position
     SPRITE_1_Y_COOR                     = $d003     ; VICII memory location to update QOTILE's actual y screen position
+    SPRITE_2_X_COOR                     = $d004     ; VICII memory location to update YAR's bullet actual x screen location
+    SPRITE_2_Y_COOR                     = $d005     ; VICII memory location to update YAR's bullet actual y screen location
     SPRITE_BACKGROUND_COLLISIONS        = $d01f     ; VICII register to record sprite to background collisions
 
     ;**************************
@@ -256,6 +262,8 @@ Initialize_Sprites:
     sta YARS_SPRITE_POINTER                     ; Store the sprite memory offset for Yar
     lda #$cd                                    ; Load Qotiles sprite memory offset
     sta QOTILE_SPRITE_POINTER                   ; Store the sprite memory offset for Qotile
+    lda #$cb                                    ; Load YAR's BULLET sprite memory offset
+    sta BULLET_SPRITE_POINTER                   ; Store the sprite memory offset for YAR's BULLET
     ;Turn on Sprites
     lda #$03                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
     sta $d015                                   ; Tell the VICII chip which sprites to enable
@@ -267,6 +275,7 @@ Initialize_Sprites:
     lda WHITE                                   ; Load the white color into .A
     sta SPRITE_0_COLOR                          ; Set YARs color
     sta SPRITE_1_COLOR                          ; Set Qotile's color
+    sta SPRITE_2_COLOR                          ; Set YAR's BULLET color
     ;Set Yar to HiRes
     lda #0                                      ; load Hires value to .A
     sta SPRITE_MODE                             ; Store .A into sprite mode
@@ -1090,6 +1099,7 @@ render_complete:
 !byte $1e, $81                      ; Qotile's x & y coordinates [Memory: $311E, $311F]
 !byte $00                           ; Shield Bump variable [Memory: $3120]
 !byte $0f                           ; Bump Distance [Memory: $3121]
+!byte $3f, $60                      ; Yar's Bullet x & y coordinates [Memory: $3122, $3123]
 
 *=$3140
 ; SPRITE IMAGE DATA : 14 images : total size is 896 ($380) bytes.
