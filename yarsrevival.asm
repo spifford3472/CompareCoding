@@ -110,6 +110,7 @@
     USER_INPUT_COUNTER                  = $311A     ; The number of screen interupts that have occurred since the last user update
     USER_INPUT_TRIGGER                  = $311B     ; The number of screen interupts to occur before updating the user input
     YARS_MOVEMENT_SPEED                 = $03       ; Controls many pixels YAR moves with each user input
+    BULLET_MOVEMENT_SPEED               = $06       ; Controls how many pixels Yar's bullet moves
     SHIELD_BUMP                         = $3120     ; Shield Bump in Progress (0=No 1=Yes)
     BUMP_DISTANCE_LEFT                  = $3121     ; Distance remaining on the shield bump
     BUMP_DISTANCE_SETTING               = $08       ; Distance for bump to move left
@@ -441,14 +442,20 @@ move_sprites:
     jsr Calculate_Bullet_Position       ; Calculate where on the screen YAR is (text x,y value)
     lda BULLET_X_COORDINATE
     cmp SPRITE_MAX_X_COORDINATE
-    bcc finish_sprite                           ; if not at max screen location then continue
+    bcc move_bullet                             ; if not at max screen location then continue
     lda #$00                                    ; Load .A with FALSE flag
     sta BULLET_LIVE                             ; Turn Yars bullet off
     ;Turn off the bullet display
     lda $d015                                   ; Load currently enabled sprites
     and #%11111011                              ; Calculate AND to turn off Sprite #2 (Bullet)
     sta $d015                                   ; Tell the VICII chip which sprites to enable
-:finish_sprite
+    jmp finish_sprite
+move_bullet:
+    lda BULLET_X_COORDINATE                       ; Load x-coor
+    clc                                         ; Clear Carry Flag before Add with Cary
+    adc #BULLET_MOVEMENT_SPEED                    ; MAdd the speed of movement to the x-coor
+    sta BULLET_X_COORDINATE                       ; store the new x-coor
+finish_sprite:
     jmp Do_User_Commands
 
 
@@ -611,10 +618,14 @@ Press_Fire_Button:
     lda #$01                                    ; Load .A with literal number 1 to indicate the bullet is live
     sta BULLET_LIVE                             ; Store .A value into the BULLET_LIVE status indicator
     ;Set Bullet x,y tto match Yar's x,y
-    lda YARS_Y_COORDINATE                       ; Copy Yar's Y coordinate to the bullet
-    sta BULLET_Y_COORDINATE
-    lda YARS_X_COORDINATE                       ; Copy Yar's X coordinate to the bullet
+    lda SPRITE_0_Y_COOR                         ; Copy Yar's Y coordinate to the bullet
+    sta SPRITE_2_Y_COOR
+    lda SPRITE_0_X_COOR                       ; Copy Yar's X coordinate to the bullet
+    sta SPRITE_2_X_COOR
+    lda YARS_X_COORDINATE
     sta BULLET_X_COORDINATE
+    lda YARS_Y_COORDINATE
+    sta BULLET_Y_COORDINATE
     ;display the bullet
     lda $d015                                   ; Load currently enabled sprites
     ora #%00000100                              ; Calculate OR to turn on Sprite #2 (Bullet)
