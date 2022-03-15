@@ -113,6 +113,7 @@
     SHIELD_BUMP                         = $3120     ; Shield Bump in Progress (0=No 1=Yes)
     BUMP_DISTANCE_LEFT                  = $3121     ; Distance remaining on the shield bump
     BUMP_DISTANCE_SETTING               = $08       ; Distance for bump to move left
+    BULLET_LIVE                         = $3124     ; Indicate's the status of YAR's bullet
 
     ;**************************
     ; SPRITE VALUES
@@ -136,8 +137,8 @@
     JOYSTICK_X                          = $3117     ; Players X Input value
     JOYSTICK_Y                          = $3118     ; Players Y Input Value
     JOYSTICK_FIRE                       = $3119     ; Players Fire Input Value
-    YARS_SCREEN_POSITION_Y              = $311C     ; YARS screen text position - Y
-    YARS_SCREEN_POSITION_X              = $311D     ; YARS screen text position - X
+    BULLET_SCREEN_POSITION_Y            = $311C     ; BULLET screen text position - Y
+    BULLET_SCREEN_POSITION_X            = $311D     ; BULLET screen text position - X
     QOTILE_X_COORDINATE                 = $311E     ; Memory location to Qotile's X-coordinate on screen
     QOTILE_Y_COORDINATE                 = $311F     ; Memory location to Qotile's Y-coordinate on screen
     BULLET_X_COORDINATE                 = $3122     ; Memory location to store YAR's bullet actual x screen position
@@ -217,12 +218,12 @@ check_screen_update:
     ; Mathmatical Formulas
     ; *************************
 
-    ;***************************************
-    ; Calculate screen line yar is occupying
-    ;***************************************
+    ;************************************************
+    ; Calculate screen line yar's bullet is occupying
+    ;************************************************
     ; Implement screen_line_y = INT((yar_y_position-50)/8)+2
-find_YARS_Y_screenline:
-    lda YARS_Y_COORDINATE                       ; Load the y-coord value of YAR
+find_BULLET_Y_screenline:
+    lda BULLET_Y_COORDINATE                     ; Load the y-coord value of YAR's bullet
     sec                                         ; Set carry flag for subtraction
     sbc #50                                     ; Subtract #50
     lsr                                         ; Divide by 2, 3 times by shifting 
@@ -230,12 +231,12 @@ find_YARS_Y_screenline:
     lsr 
     clc                                         ; Clear Carry Flag before Add with Cary
     adc #2                                      ; Add 2 to the equation to offset for sprite looks
-    sta YARS_SCREEN_POSITION_Y                  ; Store the Y coordinate location
+    sta BULLET_SCREEN_POSITION_Y                ; Store the Y coordinate location
     rts 
 
     ; Implement screen_line_x = INT((yar_y_position-50)/8)+2
-find_YARS_X_screenline:
-    lda YARS_X_COORDINATE                       ; Load the y-coord value of YAR
+find_BULLET_X_screenline:
+    lda BULLET_X_COORDINATE                     ; Load the y-coord value of YAR's bullet
     sec                                         ; Set carry flag for subtraction
     sbc #24                                     ; Subtract #24
     lsr                                         ; Divide by 2, 3 times by shifting 
@@ -243,12 +244,12 @@ find_YARS_X_screenline:
     lsr 
     clc                                         ; Clear Carry Flag before Add with Cary
     adc #2                                      ; Add 2 to the equation to offset for sprite looks
-    sta YARS_SCREEN_POSITION_X                  ; Store the X coordinate location
+    sta BULLET_SCREEN_POSITION_X                ; Store the X coordinate location
     rts 
 
-Calculate_YARS_Character_Position:
-    jsr find_YARS_Y_screenline
-    jsr find_YARS_X_screenline
+Calculate_Bullet_Position:
+    jsr find_BULLET_Y_screenline
+    jsr find_BULLET_X_screenline
     rts 
 
 
@@ -434,7 +435,19 @@ move_sprites:
     lda YARS_Y_COORDINATE                       ; Put Yar into the correct y position on the screen
     sta SPRITE_0_Y_COOR
     ;Calculate YARS Screen Character Position
-    jsr Calculate_YARS_Character_Position       ; Calculate where on the screen YAR is (text x,y value)
+    lda BULLET_LIVE
+    beq finish_sprite
+    jsr process_bullet_horizontal_movement
+    jsr Calculate_Bullet_Position       ; Calculate where on the screen YAR is (text x,y value)
+    lda BULLET_X_COORDINATE
+    cmp SPRITE_MAX_X_COORDINATE
+    bcc finish_sprite                           ; if not at max screen location then continue
+    lda #$00                                    ; Load .A with FALSE flag
+    sta BULLET_LIVE                             ; Turn Yars bullet off
+    ;Turn off the bullet display
+    lda $d015                                   ; Load currently enabled sprites
+    and #%11111011                              ; Calculate AND to turn off Sprite #2 (Bullet)
+    sta $d015                                   ; Tell the VICII chip which sprites to enable
 :finish_sprite
     jmp Do_User_Commands
 
@@ -478,6 +491,23 @@ complete_horizontal_movement:
     sta SPRITE_X_MSB_LOCATION                   ; Store .A into X-MSB location for 9th bit
     rts
 
+process_bullet_horizontal_movement:
+    lda BULLET_X_COORDINATE                     ; Load YAR'S Bullet x-coordinate
+    asl                                         ; double the coordinate
+    sta SPRITE_2_X_COOR                         ; store the result in the proper X register
+    bcc clear_bullet_ninth_bit                  ; If carry flag from doubling is clear, don't set 9th bit
+    ;Set Yar's Bullet 9th bit
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00000100                              ; Use bit-wise OR to set the bit for sprite 2
+    jmp complete_horizontal_bullet_movement
+clear_bullet_ninth_bit:
+    lda SPRITE_X_MSB_LOCATION
+    and #%11111011                              ; Use bit-wise AND to unset the bit for sprite 2
+    jmp complete_horizontal_bullet_movement
+complete_horizontal_bullet_movement:
+    sta SPRITE_X_MSB_LOCATION                   ; Store .A into X-MSB location for 9th bit
+    rts
+
 Move_The_Player:
     ;Move YAR
     jsr process_sprite_horizontal_movemement    ; Process the horizontal move
@@ -518,7 +548,7 @@ ResetShieldBump:
 Start_Joystick_Read:
     jsr get_joystick_command                    ; Get user input
     bcs process_user_movement                   ; If fire button not pressed process any movement
-    nop                                         ; PROCESS FIRE BUTTON BEING PUSHED
+    jsr Press_Fire_Button                       ; PROCESS FIRE BUTTON BEING PUSHED
 process_user_movement:
     lda JOYSTICK_X                              ; Load the users joystick x-coordinate request
     beq check_verticle                          ; If the x-coor request = 0 then check y-coor
@@ -575,6 +605,22 @@ complete_user_input:
     jsr DetectYarBackgroundHit
     rts                                         ; Return to calling procedure
 
+Press_Fire_Button:
+    lda BULLET_LIVE                             ; Load .A with Yar's bullet status
+    bne complete_fire_button                    ; Yar's bullet is already active so we can jump back to the calling process
+    lda #$01                                    ; Load .A with literal number 1 to indicate the bullet is live
+    sta BULLET_LIVE                             ; Store .A value into the BULLET_LIVE status indicator
+    ;Set Bullet x,y tto match Yar's x,y
+    lda YARS_Y_COORDINATE                       ; Copy Yar's Y coordinate to the bullet
+    sta BULLET_Y_COORDINATE
+    lda YARS_X_COORDINATE                       ; Copy Yar's X coordinate to the bullet
+    sta BULLET_X_COORDINATE
+    ;display the bullet
+    lda $d015                                   ; Load currently enabled sprites
+    ora #%00000100                              ; Calculate OR to turn on Sprite #2 (Bullet)
+    sta $d015                                   ; Tell the VICII chip which sprites to enable
+complete_fire_button:
+    rts                                         ; Return to calling subroutine
 
 ; The following routine for the joystick read was originally 
 ; written by Bill Hindorf and published in the Programmer's
@@ -1094,12 +1140,13 @@ render_complete:
 !byte $00, $00, $00                 ; Players joystick commands [Memory: $3117, $3118, $3119]
 !byte $00                           ; User Input interupt counter [Memory: $311A]
 !byte $02                           ; User input interupt action trigger [Memory: $311B]
-!byte $00                           ; YARS screen y-coordinate (PETSCII) [Memory: $311C]
-!byte $00                           ; YARS screen x-coordinate (PETSCII) [Memory: $311D]
+!byte $00                           ; BULLET screen y-coordinate (PETSCII) [Memory: $311C]
+!byte $00                           ; BULLET screen x-coordinate (PETSCII) [Memory: $311D]
 !byte $1e, $81                      ; Qotile's x & y coordinates [Memory: $311E, $311F]
 !byte $00                           ; Shield Bump variable [Memory: $3120]
 !byte $0f                           ; Bump Distance [Memory: $3121]
 !byte $3f, $60                      ; Yar's Bullet x & y coordinates [Memory: $3122, $3123]
+!byte $00                           ; Yar's Bullet Status [Memory: $3124]
 
 *=$3140
 ; SPRITE IMAGE DATA : 14 images : total size is 896 ($380) bytes.
