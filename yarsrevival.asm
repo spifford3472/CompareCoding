@@ -113,8 +113,11 @@
     BULLET_MOVEMENT_SPEED               = $06       ; Controls how many pixels Yar's bullet moves
     SHIELD_BUMP                         = $3120     ; Shield Bump in Progress (0=No 1=Yes)
     BUMP_DISTANCE_LEFT                  = $3121     ; Distance remaining on the shield bump
-    BUMP_DISTANCE_SETTING               = $08       ; Distance for bump to move left
+    BUMP_DISTANCE_SETTING               = $03       ; Distance for bump to move left
     BULLET_LIVE                         = $3124     ; Indicate's the status of YAR's bullet
+    BULLET_COLOR_OFFSET_MAX             = $3125     ; Max memory offset for color animation
+    BULLET_COLOR_COUNTER                = $3126     ; Current color count offset
+    BULLET_COLOR_POINTER                = $3127     ; Start of color map
 
     ;**************************
     ; SPRITE VALUES
@@ -267,12 +270,16 @@ Initialize_Sprites:
     lda #$cb                                    ; Load YAR's BULLET sprite memory offset
     sta BULLET_SPRITE_POINTER                   ; Store the sprite memory offset for YAR's BULLET
     ;Turn on Sprites
-    lda #$03                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
+    lda #$07                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
     sta $d015                                   ; Tell the VICII chip which sprites to enable
     ;Set Yar's position on the screen
     jsr process_sprite_horizontal_movemement    ; Process YARs X-Coor
     lda YARS_Y_COORDINATE                       ; Load YARs y-coord into .A
     sta SPRITE_0_Y_COOR                         ; Set y-coor for Yar
+    ;Set Yar's Bullet position
+    jsr process_bullet_horizontal_movement
+    lda BULLET_Y_COORDINATE
+    sta SPRITE_2_Y_COOR
     ;Set Yar's and Qotile's color
     lda WHITE                                   ; Load the white color into .A
     sta SPRITE_0_COLOR                          ; Set YARs color
@@ -288,7 +295,7 @@ Initialize_Sprites:
     lda QOTILE_X_COORDINATE                     ; Load YAR'S x-coordinate
     asl                                         ; double the coordinate
     sta SPRITE_1_X_COOR
-    ;Set Yar's 9th bit for x position
+    ;Set Qotiles's 9th bit for x position
     lda SPRITE_X_MSB_LOCATION
     ora #%00000010                              ; Use bit-wise OR to set the bit for sprite 1
     jmp complete_horizontal_movement
@@ -417,6 +424,25 @@ action_screen:
     jsr Calculate_Qotile_Position
     jsr Do_Screen_Animation                     ; Translate the PETSCII screen changes onto the screen
     jmp check_sprite_animation                  ; Jump back to check the sprites
+
+animate_bullet:
+    lda BULLET_COLOR_COUNTER
+    clc
+    adc #$01
+    sta BULLET_COLOR_COUNTER
+    cmp BULLET_COLOR_OFFSET_MAX
+    bcs finish_bullet_animation
+    tay
+    lda BULLET_COLOR_POINTER,y 
+    sta SPRITE_2_COLOR
+    rts
+finish_bullet_animation:
+    lda #$00
+    sta BULLET_COLOR_COUNTER
+    lda BULLET_COLOR_POINTER
+    sta SPRITE_2_COLOR
+    rts
+
 animate_sprites:                                
     ldy #0                                      ; Reset Sprite animation counter
     sty SPRITE_INTERUPT_COUNTER
@@ -427,7 +453,7 @@ animate_sprites:
     iny                                         ; Move to the next higher animation frame reference
     sty YARS_CURRENT_FRAME
     cpy YARS_MAX_FRAME_OFFSET                   ; Compare the current animation frame to the max animation frame (last frame)
-    bcc finish_sprite                           ; If we not have reached the end of the animation then finish
+    bcc move_sprites                          ; If we not have reached the end of the animation then finish
     ldy #0                                      ; else reset the animation frame to the start
     sty YARS_CURRENT_FRAME
 move_sprites:
@@ -435,9 +461,14 @@ move_sprites:
     jsr process_sprite_horizontal_movemement    ; Put YAR into the correct x position on the screen
     lda YARS_Y_COORDINATE                       ; Put Yar into the correct y position on the screen
     sta SPRITE_0_Y_COOR
-    ;Calculate YARS Screen Character Position
+finish_sprite:
+    jmp Do_User_Commands
+
+
+    ;Move the bullet
+check_bullet_movement:
     lda BULLET_LIVE
-    beq finish_sprite
+    beq move_bullet_with_yar
     jsr process_bullet_horizontal_movement
     jsr Calculate_Bullet_Position       ; Calculate where on the screen YAR is (text x,y value)
     lda BULLET_X_COORDINATE
@@ -445,19 +476,22 @@ move_sprites:
     bcc move_bullet                             ; if not at max screen location then continue
     lda #$00                                    ; Load .A with FALSE flag
     sta BULLET_LIVE                             ; Turn Yars bullet off
-    ;Turn off the bullet display
-    lda $d015                                   ; Load currently enabled sprites
-    and #%11111011                              ; Calculate AND to turn off Sprite #2 (Bullet)
-    sta $d015                                   ; Tell the VICII chip which sprites to enable
-    jmp finish_sprite
+    lda #$03
+    sta BULLET_X_COORDINATE
+    jsr process_bullet_horizontal_movement
+    jmp bullet_movement_done
 move_bullet:
     lda BULLET_X_COORDINATE                       ; Load x-coor
     clc                                         ; Clear Carry Flag before Add with Cary
     adc #BULLET_MOVEMENT_SPEED                    ; MAdd the speed of movement to the x-coor
     sta BULLET_X_COORDINATE                       ; store the new x-coor
-finish_sprite:
-    jmp Do_User_Commands
-
+    jmp bullet_movement_done
+move_bullet_with_yar:
+    lda YARS_Y_COORDINATE
+    sta BULLET_Y_COORDINATE
+    sta SPRITE_2_Y_COOR
+bullet_movement_done:
+    rts
 
     ;*****************************************************
     ; Process Updates to the screen and reset the counters
@@ -596,6 +630,11 @@ do_the_move_down:
     clc                                         ; Clear the carry before add with carry
     adc #YARS_MOVEMENT_SPEED                    ; Add the speed movement to the down direction
     sta YARS_Y_COORDINATE                       ; Store the new Y-coor
+    ldx BULLET_LIVE
+    cpx #$01
+    bcs complete_user_input
+    sta BULLET_Y_COORDINATE
+    sta SPRITE_2_Y_COOR
     jmp complete_user_input                     ; Already at bottom of screen so finish
 process_up:
     lda YARS_Y_COORDINATE                       ; Load YAR's y-coordinate
@@ -608,6 +647,11 @@ do_the_move_up:
     sec                                         ; Set the carry flag before subtraction with carry
     sbc #YARS_MOVEMENT_SPEED                    ; Move YAR up by denoted speed
     sta YARS_Y_COORDINATE                       ; Store new y-coord
+    ldx BULLET_LIVE
+    cpx #$01
+    bcs complete_user_input
+    sta BULLET_Y_COORDINATE
+    sta SPRITE_2_Y_COOR
 complete_user_input:
     jsr DetectYarBackgroundHit
     rts                                         ; Return to calling procedure
@@ -620,13 +664,13 @@ Press_Fire_Button:
     ;Set Bullet x,y tto match Yar's x,y
     lda SPRITE_0_Y_COOR                         ; Copy Yar's Y coordinate to the bullet
     sta SPRITE_2_Y_COOR
-    lda SPRITE_0_X_COOR                       ; Copy Yar's X coordinate to the bullet
+    lda #$03                                     ; back of screen
     sta SPRITE_2_X_COOR
-    lda YARS_X_COORDINATE
+    lda #$03
     sta BULLET_X_COORDINATE
     lda YARS_Y_COORDINATE
     sta BULLET_Y_COORDINATE
-    ;display the bullet
+   ;display the bullet
     lda $d015                                   ; Load currently enabled sprites
     ora #%00000100                              ; Calculate OR to turn on Sprite #2 (Bullet)
     sta $d015                                   ; Tell the VICII chip which sprites to enable
@@ -746,6 +790,8 @@ irq:
     iny                             ; Increase the User Input counter
     sty USER_INPUT_COUNTER          ; Store the user Input counter
     jsr ProcessIRQ
+    jsr animate_bullet
+    jsr check_bullet_movement
     ;clear sprite to background collision flag to clear erronous hits
     ;register holds value till it is read
     lda SPRITE_BACKGROUND_COLLISIONS
@@ -1156,8 +1202,11 @@ render_complete:
 !byte $1e, $81                      ; Qotile's x & y coordinates [Memory: $311E, $311F]
 !byte $00                           ; Shield Bump variable [Memory: $3120]
 !byte $0f                           ; Bump Distance [Memory: $3121]
-!byte $3f, $60                      ; Yar's Bullet x & y coordinates [Memory: $3122, $3123]
+!byte $03, $89                      ; Yar's Bullet x & y coordinates [Memory: $3122, $3123]
 !byte $00                           ; Yar's Bullet Status [Memory: $3124]
+!byte $06                           ; Yars Bullet color counter max [Memory: $3125]
+!byte $00                           ; Yars Bullet color counter [Memory: $3126]
+!byte $00, $07, $08, $09, $02, $09, $08, $07 ; Yars bullet colors [Memory $3127-$312E]
 
 *=$3140
 ; SPRITE IMAGE DATA : 14 images : total size is 896 ($380) bytes.
@@ -1199,8 +1248,8 @@ render_complete:
 ; ===========================================
 ; Yar - Bullet - Offset: $cb
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $07,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+!byte $00,$00,$00,$00,$00,$00,$00,$ff,$00,$00,$ff,$00,$00,$ff,$00,$00
+!byte $ff,$00,$00,$ff,$00,$00,$ff,$00,$00,$ff,$00,$00,$00,$00,$00,$00
 !byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
 ; ===========================================
 ; Sprite for Qotile's missle
