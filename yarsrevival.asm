@@ -118,6 +118,7 @@
     BULLET_COLOR_OFFSET_MAX             = $3125     ; Max memory offset for color animation
     BULLET_COLOR_COUNTER                = $3126     ; Current color count offset
     BULLET_COLOR_POINTER                = $3127     ; Start of color map
+    MULTIPLY_TABLE                      = $312F     ; Multiply by 7
 
     ;**************************
     ; SPRITE VALUES
@@ -141,8 +142,8 @@
     JOYSTICK_X                          = $3117     ; Players X Input value
     JOYSTICK_Y                          = $3118     ; Players Y Input Value
     JOYSTICK_FIRE                       = $3119     ; Players Fire Input Value
-    BULLET_SCREEN_POSITION_Y            = $311C     ; BULLET screen text position - Y
-    BULLET_SCREEN_POSITION_X            = $311D     ; BULLET screen text position - X
+    YAR_SHIELD_HIT_X_COORDINATE         = $311C     ; Yar Shield Hit screen text position - Y
+    YAR_SHIELD_HIT_Y_COORDINATE         = $311D     ; Yar Shield Hit screen text position - X
     QOTILE_X_COORDINATE                 = $311E     ; Memory location to Qotile's X-coordinate on screen
     QOTILE_Y_COORDINATE                 = $311F     ; Memory location to Qotile's Y-coordinate on screen
     BULLET_X_COORDINATE                 = $3122     ; Memory location to store YAR's bullet actual x screen position
@@ -226,8 +227,8 @@ check_screen_update:
     ; Calculate screen line yar's bullet is occupying
     ;************************************************
     ; Implement screen_line_y = INT((yar_y_position-50)/8)+2
-find_BULLET_Y_screenline:
-    lda BULLET_Y_COORDINATE                     ; Load the y-coord value of YAR's bullet
+find_YAR_Y_screenline:
+    lda YARS_Y_COORDINATE             ; Load the y-coord value of YAR's shield hit
     sec                                         ; Set carry flag for subtraction
     sbc #50                                     ; Subtract #50
     lsr                                         ; Divide by 2, 3 times by shifting 
@@ -235,12 +236,12 @@ find_BULLET_Y_screenline:
     lsr 
     clc                                         ; Clear Carry Flag before Add with Cary
     adc #2                                      ; Add 2 to the equation to offset for sprite looks
-    sta BULLET_SCREEN_POSITION_Y                ; Store the Y coordinate location
+    sta YAR_SHIELD_HIT_Y_COORDINATE             ; Store the Y coordinate location
     rts 
 
     ; Implement screen_line_x = INT((yar_y_position-50)/8)+2
-find_BULLET_X_screenline:
-    lda BULLET_X_COORDINATE                     ; Load the y-coord value of YAR's bullet
+find_YAR_X_screenline:
+    lda YARS_X_COORDINATE             ; Load the x-coord value of YAR's shield hit
     sec                                         ; Set carry flag for subtraction
     sbc #24                                     ; Subtract #24
     lsr                                         ; Divide by 2, 3 times by shifting 
@@ -248,12 +249,12 @@ find_BULLET_X_screenline:
     lsr 
     clc                                         ; Clear Carry Flag before Add with Cary
     adc #2                                      ; Add 2 to the equation to offset for sprite looks
-    sta BULLET_SCREEN_POSITION_X                ; Store the X coordinate location
+    sta YAR_SHIELD_HIT_X_COORDINATE             ; Store the X coordinate location
     rts 
 
-Calculate_Bullet_Position:
-    jsr find_BULLET_Y_screenline
-    jsr find_BULLET_X_screenline
+Calculate_YAR_SHIELD_HIT_Position:
+    jsr find_YAR_Y_screenline
+    jsr find_YAR_X_screenline
     rts 
 
 
@@ -357,6 +358,23 @@ move_qotile:
     rts
 
 
+RemoveShieldComponent:
+    lda YAR_SHIELD_HIT_X_COORDINATE
+    sec
+    sbc $0f 
+    sta TEMP_STORAGE 
+    lda YAR_SHIELD_HIT_Y_COORDINATE
+    sec
+    sbc SHIELD_DISPLAY_LINE_START
+    tay 
+    lda MULTIPLY_TABLE,y 
+    clc 
+    adc TEMP_STORAGE
+    tay 
+    lda #$20
+    sta SHIELD_BASE,y
+    rts
+
     ;************************************************************
     ; Detect Yar impact with background
     ; If impact detected then shoot Yar behind the neutral line
@@ -373,7 +391,7 @@ DetectYarBackgroundHit:
 check_shield_hit:
     lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
     and #%00000001                              ; Use bitwise AND to see if Yar is involved in a collision
-    beq finishBackgroundHit                     ; if zero flags not et then no collision
+    beq finishBackgroundHit                     ; if zero flags not set then no collision
     ; Simple test to turn border yellow if hit
     ;lda #YELLOW
     ;sta BORDER_COLOR
@@ -381,6 +399,8 @@ check_shield_hit:
     bne complete_bump_setup                     ; If bump is already started then return else set the value
     lda #$01                                    ; Load .A with an "On" value (1)
     sta SHIELD_BUMP                             ; Turn on shield Bump
+    jsr Calculate_YAR_SHIELD_HIT_Position       ; Calculate where YAR hit the shield
+    jsr RemoveShieldComponent                   ; Remove the part of the shield hit
 complete_bump_setup:
     rts 
 checkNeutralZoneHit:   
@@ -470,7 +490,6 @@ check_bullet_movement:
     lda BULLET_LIVE
     beq move_bullet_with_yar
     jsr process_bullet_horizontal_movement
-    jsr Calculate_Bullet_Position       ; Calculate where on the screen YAR is (text x,y value)
     lda BULLET_X_COORDINATE
     cmp SPRITE_MAX_X_COORDINATE
     bcc move_bullet                             ; if not at max screen location then continue
@@ -1207,6 +1226,7 @@ render_complete:
 !byte $06                           ; Yars Bullet color counter max [Memory: $3125]
 !byte $00                           ; Yars Bullet color counter [Memory: $3126]
 !byte $00, $07, $08, $09, $02, $09, $08, $07 ; Yars bullet colors [Memory $3127-$312E]
+!byte $00, $07, $0E, $15, $1C, $23, $2A, $31, $38, $3F, $46  ; Multiply lookup by 7 [Memory $312F-$3139]
 
 *=$3140
 ; SPRITE IMAGE DATA : 14 images : total size is 896 ($380) bytes.
