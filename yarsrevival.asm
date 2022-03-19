@@ -371,8 +371,17 @@ RemoveShieldComponent:
     clc 
     adc TEMP_STORAGE
     tay 
+    ;Check if block exists
+    lda SHIELD_BASE,y 
+    cmp #$20
+    beq DO_CALC_OFFSET
     lda #$20
     sta SHIELD_BASE,y
+    rts
+DO_CALC_OFFSET:
+    iny
+    lda #$20
+    sta SHIELD_BASE,y 
     rts
 
     ;************************************************************
@@ -1132,17 +1141,29 @@ render_complete:
 !byte $00 ; TEMP_STORAGE [Memory Location = $3054]
 
 ; Color for Shield
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 1  (Start $3055 End $305B)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 2  (Start $305C End $3062)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 3  (Start $3063 End $3069)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 4  (Start $306A End $3070)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 5  (Start $3071 End $3077)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 6  (Start $3078 End $307E)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 7  (Start $307F End $3085)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 8  (Start $3086 End $308C)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 9  (Start $308D End $3093)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 10 (Start $3094 End $309A)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 11 (Start $309b End $30A1)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 1  (Start $3055 End $305B)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 2  (Start $305C End $3062)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 3  (Start $3063 End $3069)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 4  (Start $306A End $3070)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 5  (Start $3071 End $3077)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 6  (Start $3078 End $307E)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 7  (Start $307F End $3085)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 8  (Start $3086 End $308C)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 9  (Start $308D End $3093)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 10 (Start $3094 End $309A)
+;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 11 (Start $309b End $30A1)
+
+!byte $01, $02, $03, $05, $06, $07, $09     ; Line 1  (Start $3055 End $305B)
+!byte $09, $01, $02, $03, $05, $06, $07     ; Line 2  (Start $305C End $3062)
+!byte $07, $09, $01, $02, $03, $05, $06     ; Line 3  (Start $3063 End $3069)
+!byte $06, $07, $09, $01, $02, $03, $05     ; Line 4  (Start $306A End $3070)
+!byte $05, $06, $07, $09, $01, $02, $03     ; Line 5  (Start $3071 End $3077)
+!byte $03, $05, $06, $07, $09, $01, $02     ; Line 6  (Start $3078 End $307E)
+!byte $02, $03, $05, $06, $07, $09, $01     ; Line 7  (Start $307F End $3085)
+!byte $01, $02, $03, $05, $06, $07, $09     ; Line 8  (Start $3086 End $308C)
+!byte $09, $01, $02, $03, $05, $06, $07     ; Line 9  (Start $308D End $3093)
+!byte $07, $09, $01, $02, $03, $05, $06     ; Line 10 (Start $3094 End $309A)
+!byte $06, $07, $09, $01, $02, $03, $05     ; Line 11 (Start $309b End $30A1)
 
 ; Screen Base addresses for potential shield locations low_byte, high_byte pairs
 !byte $21, $04  ; Screen Address ($0421 = Line 1, Column 34 [Memory: $30A2, $30A3])
