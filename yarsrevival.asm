@@ -361,7 +361,7 @@ move_qotile:
 RemoveShieldComponent:
     lda YAR_SHIELD_HIT_X_COORDINATE
     sec
-    sbc #$0f 
+    sbc #$0f
     sta TEMP_STORAGE 
     lda YAR_SHIELD_HIT_Y_COORDINATE
     sec
@@ -1227,6 +1227,7 @@ render_complete:
 !byte $00                           ; Yars Bullet color counter [Memory: $3126]
 !byte $00, $07, $08, $09, $02, $09, $08, $07 ; Yars bullet colors [Memory $3127-$312E]
 !byte $00, $07, $0E, $15, $1C, $23, $2A, $31, $38, $3F, $46  ; Multiply lookup by 7 [Memory $312F-$3139]
+
 
 *=$3140
 ; SPRITE IMAGE DATA : 14 images : total size is 896 ($380) bytes.
