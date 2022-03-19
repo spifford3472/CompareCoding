@@ -361,7 +361,7 @@ move_qotile:
 RemoveShieldComponent:
     lda YAR_SHIELD_HIT_X_COORDINATE
     sec
-    sbc $0f 
+    sbc #$0f 
     sta TEMP_STORAGE 
     lda YAR_SHIELD_HIT_Y_COORDINATE
     sec
