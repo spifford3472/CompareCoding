@@ -139,13 +139,15 @@
     BULLET_COLOR_COUNTER                = $3126     ; Current color count offset
     BULLET_COLOR_POINTER                = $3127     ; Start of color map
 
-    ;***************
-    ; User Constants
-    ;***************
+    ;************************
+    ; User/Sprite  Constants
+    ;************************
     USER_INPUT_TRIGGER                  = $311B     ; The number of screen interupts to occur before updating the user input
     BUMP_DISTANCE_SETTING               = $03       ; Distance for bump to move left
     YARS_ANIMATION_BASE                 = $3108     ; Base memory location containing offsets for YAR's animation
     YARS_MAX_FRAME_OFFSET               = $310F     ; Number of animation frames used for YAR
+    SWIRL_ANIMATION_BASE                = $351b     ; Base memory containing offsets for SWIRL's animation
+    SWIRL_MAX_FRAME_OFFSET              = $3521     ; Number of animation frames used for SWIRL
 
     ;********************
     ; Caluclation Lookups
@@ -224,6 +226,7 @@
     YAR_SHIELD_HIT_Y_COORDINATE         = $311D     ; Yar Shield Hit screen text position - X
     SWIRL_LIVE                          = $3516     ; Denotes if SWIRL is Active or off screen
     DISABLE_FIRE_BUTTON                 = $3518     ; If non-zero then fire button should be disabled
+    SWIRL_CURRENT_FRAME                 = $3520     ; Current SWIRL animation frame
 
     ;**************************
     ; OTHER VALUES
@@ -241,7 +244,8 @@
     QOTILE_Y_COORDINATE                 = $311F     ; Memory location to Qotile's Y-coordinate on screen
     BULLET_X_COORDINATE                 = $3122     ; Memory location to store YAR's bullet actual x screen position
     BULLET_Y_COORDINATE                 = $3123     ; Memory location to store YAR's bullet actual y screen position
-
+    SWIRL_X_COORDINATE                  = $3519     ; Memory location to store SWIRL's X Coordinate
+    SWIRL_Y_COORDINATE                  = $351A     ; Memory location to store SWIRL's Y Coordinate
 
 
  
@@ -284,6 +288,12 @@ GamePlay:
     cmp #1                          ; If the screen was updated during an interupt
     bne process_updates             ; process the next animation frame                                    
     ; Check for SWIRL
+    lda SWIRL_LIVE
+    beq do_swirl_checks
+    lda #0
+    sta SWIRL_INTERUPT_COUNTER
+    jmp GamePlay
+do_swirl_checks:
     lda SWIRL_INTERUPT_COUNTER      ; Load the current SWIRL Interupt counter
     cmp SWIRL_CHECK_TRIGGER         ; subtract trigger value
     bcs Check_Swirl_Create          ; Need to see if a Swirl is created
@@ -437,6 +447,8 @@ Initialize_Sprites:
     ora #%00000010                              ; Use bit-wise OR to set the bit for sprite 1
     jmp complete_horizontal_movement
     sta SPRITE_X_MSB_LOCATION    
+    ;Setup the SWIRL
+
     rts
 
 
@@ -635,15 +647,6 @@ finishBackgroundHit:
     sta DISABLE_FIRE_BUTTON                     ; Store the fire button update
     lda #BLUE
     sta BORDER_COLOR
-    ;***********************************************************************
-    ;*********************************************************
-    ;***********************
-    ;REMOVE ME
-    lda #$00
-    sta SWIRL_LIVE
-    ;***********************
-    ;*********************************************************
-    ;***********************************************************************
     rts 
     
 
@@ -714,9 +717,27 @@ animate_sprites:
     iny                                         ; Move to the next higher animation frame reference
     sty YARS_CURRENT_FRAME
     cpy YARS_MAX_FRAME_OFFSET                   ; Compare the current animation frame to the max animation frame (last frame)
-    bcc move_sprites                            ; If we not have reached the end of the animation then finish
+    bcc animate_swirl                           ; If we not have reached the end of the animation then move to next animation
     ldy #0                                      ; else reset the animation frame to the start
     sty YARS_CURRENT_FRAME
+animate_swirl:
+    ; Add code to animate Swirl
+    lda SWIRL_LIVE                              ; Load the SWIRL Live flag to .A
+    beq ShowQotile                              ; if not set then go to move sprites
+    ;Animate Swirl
+    ldy SWIRL_CURRENT_FRAME                     ; Get SWIRL's current frame
+    lda SWIRL_ANIMATION_BASE,y                  ; Load .A with the current animation frame
+    sta QOTILE_SPRITE_POINTER                   ; Ensure Qotile becomes the SWIRL
+    iny                                         ; Move to the next higher animation frame reference
+    sty SWIRL_CURRENT_FRAME
+    cpy SWIRL_MAX_FRAME_OFFSET                  ; Compare the current SWIRL animation frame to the max animation frame (last frame)
+    bcc move_sprites                            ; If we have not reached the end of the animation move on
+    ldy #0                                      ; else reset the animation frame to the start
+    sty SWIRL_CURRENT_FRAME                     
+    jmp move_sprites
+ShowQotile:
+    lda #$cd                                    ; Load Qotiles sprite memory offset
+    sta QOTILE_SPRITE_POINTER                   ; Store the sprite memory offset for Qotile
 move_sprites:
     ;Set Yar's position on the screen
     jsr process_sprite_horizontal_movemement    ; Put YAR into the correct x position on the screen
@@ -1577,3 +1598,8 @@ render_complete:
 !byte $00                           ; SWIRL Live [Memory: $3516]
 !byte $00                           ; SWIRL RUN COUNT [Memory: $3517]
 !byte $00                           ; Disable Fire button [Memory: $3518]
+!byte $00                           ; SWIRL_X_COORDINATE [Memory: $3519]
+!byte $00                           ; SWIRL_Y_COORDINATE [Memory: $351A]
+!byte $CE, $CF, $D0, $D1, $D2       ; SWIRL Animation Frames [Memory: $351B - $351F]
+!byte $00                           ; SWIRL Current Frame [Memory: $3520]
+!byte $05                           ; SWIRL Max Animation [Memory: $3521]       
