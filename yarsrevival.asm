@@ -123,6 +123,7 @@
     ;SWIRL VALUES
     ;***************************
     SWIRL_CHECK_TRIGGER                 = $3513     ; IRQ counter before checking if SWIRL should generate  
+    DEFAULT_SWIRL_LOCATION              = $3525     ; Starting X-Coordinate    
 
 
     ;***********************
@@ -227,6 +228,9 @@
     SWIRL_LIVE                          = $3516     ; Denotes if SWIRL is Active or off screen
     DISABLE_FIRE_BUTTON                 = $3518     ; If non-zero then fire button should be disabled
     SWIRL_CURRENT_FRAME                 = $3520     ; Current SWIRL animation frame
+    SWIRL_COUNTDOWN_RESET_VALUE         = $3523     ; Value to countdown from for SWIRL launch
+    SWIRL_COUNTDOWN                     = $3522     ; Storage for countdown timer to fire the SWIRL
+    SWIRL_CHASE                         = $3524     ; Flag to indicate if the SWIRL is on the move
 
     ;**************************
     ; OTHER VALUES
@@ -288,10 +292,10 @@ GamePlay:
     cmp #1                          ; If the screen was updated during an interupt
     bne process_updates             ; process the next animation frame                                    
     ; Check for SWIRL
-    lda SWIRL_LIVE
-    beq do_swirl_checks
-    lda #0
-    sta SWIRL_INTERUPT_COUNTER
+    lda SWIRL_LIVE                  ; Load if SWIRL is active flag
+    beq do_swirl_checks             ; If the SWIRL Live flag is false, check if it is time for the SWIRL
+    lda #0                          ; SWIRL must be live so reset the swirl counter
+    sta SWIRL_INTERUPT_COUNTER      ; Save the updated SWIRL counter
     jmp GamePlay
 do_swirl_checks:
     lda SWIRL_INTERUPT_COUNTER      ; Load the current SWIRL Interupt counter
@@ -307,29 +311,29 @@ check_screen_update:
     sty SCREEN_UPDATE_OCCURRED
     jmp GamePlay
 Check_Swirl_Create:
-    lda #$00
-    sta SWIRL_INTERUPT_COUNTER
-    lda RANDOM_NUMBER
-    cmp SWIRL_THRESHOLD
-    bpl Try_To_Swirl
+    lda #$00                        ; Reset the SWIRL interupt counter
+    sta SWIRL_INTERUPT_COUNTER      ; Store the reset SWIRL INTERUPT counter
+    lda RANDOM_NUMBER               ; obtain a new random number
+    cmp SWIRL_THRESHOLD             ; compare the SWIRL trigger number to the random number
+    bpl Try_To_Swirl                ; If the random number is >= SWIRL threshold, then we attempt to SWIRL
     jmp GamePlay
 Try_To_Swirl:
-    ldy SWIRL_RUN_COUNT
-    iny
-    sta SWIRL_RUN_COUNT
-    lda SWIRL_RUN_COUNT
-    cmp #$02
-    bpl Set_Swirl_On
+    ldy SWIRL_RUN_COUNT             ; Load the number of attempts make to SWIRL
+    iny                             ; Increase the attempt number
+    sta SWIRL_RUN_COUNT             ; Store the SWIRL attempt count
+    lda SWIRL_RUN_COUNT             ; Load the SWIRL attempt count into .A
+    cmp #$02                        ; Have we attempted at least twice
+    bpl Set_Swirl_On                ; If Yes the allow the SWIRL
     jmp GamePlay
 Set_Swirl_On:
-    lda #$00
+    lda #$00                        ; Reset the SWIRL attempts to zero
     sta SWIRL_RUN_COUNT
-    lda RANDOM_NUMBER
-    sta SWIRL_THRESHOLD
-    lda #YELLOW
-    sta BORDER_COLOR
-    lda #$01
+    lda RANDOM_NUMBER               ; Obtain a new random number and put into 
+    sta SWIRL_THRESHOLD             ;   the SWIRL threshold
+    lda #$01                        ; Set the SWIRL Live flag to True
     sta SWIRL_LIVE
+    ldx SWIRL_COUNTDOWN_RESET_VALUE ; Load value into .X for the SWIRL to wait to launch
+    stx SWIRL_COUNTDOWN             ; put the .X value into the Swirl launch countdown
     jmp GamePlay
 
     ;****************************************
@@ -439,7 +443,9 @@ Initialize_Sprites:
     lda QOTILE_Y_COORDINATE                     ; Load Qotiles Y coordinste into .A
     sta SPRITE_1_Y_COOR                         ; Store y-coordinate for Qotile
     ;Set Qotiles X coordinate using 9th bit
-    lda QOTILE_X_COORDINATE                     ; Load YAR'S x-coordinate
+    lda DEFAULT_SWIRL_LOCATION
+    sta SWIRL_X_COORDINATE
+    sta QOTILE_X_COORDINATE
     asl                                         ; double the coordinate
     sta SPRITE_1_X_COOR
     ;Set Qotiles's 9th bit for x position
@@ -447,8 +453,6 @@ Initialize_Sprites:
     ora #%00000010                              ; Use bit-wise OR to set the bit for sprite 1
     jmp complete_horizontal_movement
     sta SPRITE_X_MSB_LOCATION    
-    ;Setup the SWIRL
-
     rts
 
 
@@ -501,8 +505,14 @@ qotile_moveup:
     sbc #$08                                    ; Reduce Qotile's y-coor by 8 pixels
     sta QOTILE_Y_COORDINATE
 move_qotile:
+    lda SWIRL_CHASE                             ; Load the SWIRL Chase flag
+    beq use_qotile
+    lda SWIRL_Y_COORDINATE
+    sta SPRITE_1_Y_COOR
+use_qotile:
     lda QOTILE_Y_COORDINATE                     ; Qotile only moves in the y axis, so 
     sta SPRITE_1_Y_COOR                         ; no need to update X coordinate    
+    sta SWIRL_Y_COORDINATE                      ; Keep Qotile and Swirl on Same Y coordindate
     rts
 
     ;****************************************************
@@ -746,6 +756,58 @@ move_sprites:
 finish_sprite:
     jmp Do_User_Commands
 
+    ;***********************
+    ;Move the SWIRL
+    ;***********************
+check_SWIRL_movement:
+    ; Check should we be moving the swirl
+    lda SWIRL_CHASE                             ; Load the SWIRL chase flag
+    beq finish_SWIRL_movement                   ; If flag not set return out of this routine
+    ; Calculate new position of the SWIRL
+    lda YARS_Y_COORDINATE                       ; Load the YAR's Y coordinate
+    cmp SWIRL_Y_COORDINATE                      ; Compare to the Y of SWIRL
+    bcc yar_above_swirl                         ; Jump if YAR is above the SWIRL
+yar_below_swirl:
+    ldy SWIRL_Y_COORDINATE                      ; Load .Y with the SWIRL Y coordinate
+    iny                                         ; Increment Y to move down on the screen
+    cpy #$e7                                    ; Compare to $E7 (Are we at bottom of screen?)
+    bcc update_swirl_x                          ; Not at bottom of screen keep moving
+    ldy #$e7                                    ; Set SWIRL Y-Corrdinate to bottom of screen
+    jmp update_swirl_x
+yar_above_swirl:
+    ldy SWIRL_Y_COORDINATE                      ; Load .Y with SWIRL Y Coordinate
+    dey                                         ; Decrement T to move up on the screen
+    cpy #$30                                    ; Compare to $30 (Are we at top of screen)
+    bcs update_swirl_x                          ; Not at top of screen keep moving
+    ldy #$30                                    ; Set SWIRL to top of screen
+update_swirl_x:
+    sty SWIRL_Y_COORDINATE                      ; Store the new y coordinate
+    ldx SWIRL_X_COORDINATE                      ; Load the x coordinate
+    dex                                         ; decrememnt the x register by one
+    dex                                         ; decrememnt the x register by one
+    stx SWIRL_X_COORDINATE
+    cpx #$06                                    ; Are we too far to the left
+    bcc turn_off_swirl                          ; If we hit the left side return to Qotile
+    jsr process_swirl_horizontal_movement       ; Set SWIRL Location
+    lda SWIRL_Y_COORDINATE                      ; Set SWIRL Y location
+    sta SPRITE_1_Y_COOR
+    jmp finish_SWIRL_movement
+turn_off_swirl:                                 ; Turn off the SWIRL and retrun to Qotile
+    lda #$00                                    ; Load zero value for flags
+    sta SWIRL_CHASE                             ; Set SWIRL Chase to false
+    sta SWIRL_LIVE                              ; Set SWIRL Live to false
+    lda #$CD                                    ; Set the sprite pointer back to Qotile
+    sta QOTILE_SPRITE_POINTER
+    lda QOTILE_Y_COORDINATE                     ; load quotile's Y coord back into defaults
+    sta SPRITE_1_Y_COOR
+    sta SWIRL_Y_COORDINATE
+    lda DEFAULT_SWIRL_LOCATION
+    sta SWIRL_X_COORDINATE
+    sta QOTILE_X_COORDINATE                     ; Load Quotiles x Coordinate
+    sta SPRITE_1_X_COOR
+    jsr process_swirl_horizontal_movement
+finish_SWIRL_movement:
+    rts
 
     ;Move the bullet
 check_bullet_movement:
@@ -830,6 +892,24 @@ clear_bullet_ninth_bit:
 complete_horizontal_bullet_movement:
     sta SPRITE_X_MSB_LOCATION                   ; Store .A into X-MSB location for 9th bit
     rts
+
+process_swirl_horizontal_movement:
+    lda SWIRL_X_COORDINATE                      ; Load SWIRLS's x-coordinate
+    asl                                         ; Double the coordinate
+    sta SPRITE_1_X_COOR                         ; Store the result in the proper X register
+    bcc clear_swirl_ninth_bit
+    ;Set SWIRL's 9th bit
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00000010                              ; Use bitwise OR to set the bit for sprite 1
+    jmp complete_swirl_horizontal_movement
+clear_swirl_ninth_bit:
+    lda SPRITE_X_MSB_LOCATION
+    and #%11111101                              ; Use bitwise AND to unset the bit for sprite 1
+    jmp complete_swirl_horizontal_movement
+complete_swirl_horizontal_movement:
+    sta SPRITE_X_MSB_LOCATION
+    rts
+
 
 Move_The_Player:
     ;Move YAR
@@ -1077,9 +1157,21 @@ irq:
     ldy SWIRL_INTERUPT_COUNTER      ; Load the SWIRL counter
     iny                             ; Increase the SWIRL counter
     sty SWIRL_INTERUPT_COUNTER      ; Store the SWIRL Interupt counter
+    lda SWIRL_LIVE                  ; Load the SWIRL Live flag
+    beq skip_swirl_irq              ; If flag is not set don't compute countdown to fire 
+    ldx SWIRL_COUNTDOWN             ; Load the current SWIRL fire countdown timer
+    beq swirl_chase_set
+    dex                             ; Decrement the counter by 1
+    stx SWIRL_COUNTDOWN             ; Store .X for SWIRL Countdown
+    jmp skip_swirl_irq
+swirl_chase_set:
+    lda #$01                        ; Set flag to True
+    sta SWIRL_CHASE                 ; Save the flag into SWIRL CHASE
+skip_swirl_irq:
     jsr ProcessIRQ
     jsr animate_bullet
     jsr check_bullet_movement
+    jsr check_SWIRL_movement
     ;clear sprite to background collision flag to clear erronous hits
     ;register holds value till it is read
     lda SPRITE_BACKGROUND_COLLISIONS
@@ -1368,8 +1460,6 @@ render_complete:
 
 
 
-
-
 ;=============================================================
 ; Data for the game
 ;   Contains graphics, variable memory, and screen information
@@ -1487,7 +1577,7 @@ render_complete:
 !byte $02                           ; User input interupt action trigger [Memory: $311B]
 !byte $00                           ; BULLET screen y-coordinate (PETSCII) [Memory: $311C]
 !byte $00                           ; BULLET screen x-coordinate (PETSCII) [Memory: $311D]
-!byte $1e, $81                      ; Qotile's x & y coordinates [Memory: $311E, $311F]
+!byte $1e, $81                      ; Qotile's x & y coordinates [Memory: $311E, $311F] (Raw x is $8F)
 !byte $00                           ; Shield Bump variable [Memory: $3120]
 !byte $0f                           ; Bump Distance [Memory: $3121]
 !byte $03, $89                      ; Yar's Bullet x & y coordinates [Memory: $3122, $3123]
@@ -1598,8 +1688,12 @@ render_complete:
 !byte $00                           ; SWIRL Live [Memory: $3516]
 !byte $00                           ; SWIRL RUN COUNT [Memory: $3517]
 !byte $00                           ; Disable Fire button [Memory: $3518]
-!byte $00                           ; SWIRL_X_COORDINATE [Memory: $3519]
+!byte $8F                           ; SWIRL_X_COORDINATE [Memory: $3519]
 !byte $00                           ; SWIRL_Y_COORDINATE [Memory: $351A]
 !byte $CE, $CF, $D0, $D1, $D2       ; SWIRL Animation Frames [Memory: $351B - $351F]
 !byte $00                           ; SWIRL Current Frame [Memory: $3520]
-!byte $05                           ; SWIRL Max Animation [Memory: $3521]       
+!byte $05                           ; SWIRL Max Animation [Memory: $3521]  
+!byte $00                           ; SWIRL countdown [Memory: $3522]
+!byte $78                           ; SWIRL countdown reset value [Memory: $3523]
+!byte $00                           ; SWIRL Chase flag [Memory: $3524]
+!byte $9C                           ; DEFAULT_SWIRL_LOCATION [Memory: $3525]
