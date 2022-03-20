@@ -110,7 +110,7 @@
     USER_INPUT_COUNTER                  = $311A     ; The number of screen interupts that have occurred since the last user update
     USER_INPUT_TRIGGER                  = $311B     ; The number of screen interupts to occur before updating the user input
     YARS_MOVEMENT_SPEED                 = $03       ; Controls many pixels YAR moves with each user input
-    BULLET_MOVEMENT_SPEED               = $06       ; Controls how many pixels Yar's bullet moves
+    BULLET_MOVEMENT_SPEED               = $04       ; Controls how many pixels Yar's bullet moves (was 6)
     SHIELD_BUMP                         = $3120     ; Shield Bump in Progress (0=No 1=Yes)
     BUMP_DISTANCE_LEFT                  = $3121     ; Distance remaining on the shield bump
     BUMP_DISTANCE_SETTING               = $03       ; Distance for bump to move left
@@ -228,6 +228,10 @@ check_screen_update:
     sty SCREEN_UPDATE_OCCURRED
     jmp GamePlay
 
+    ;****************************************
+    ; QUIT GAME
+    ; Display the win or loss message
+    ;****************************************
 Quit_Game:
     ; Display Game Over Message
     ldy #0                          ; Set message counter to zero
@@ -434,13 +438,16 @@ DO_CALC_OFFSET:                                 ; Calculated position is off sli
     ; If the bullet hits Qotile, then win
     ;***********************************************************
 DetectBulletImpacts:
+    ; Ignore if bullet is not live
+    lda BULLET_LIVE
+    beq finishBulletImpact                      ; Jump out if bullet is not live
     ; Check for background impact
     ; Yar's bullet can not impact the neutral zone so we can check
     ; the SPRITE_X_MSB_LOCATION to detect what to do
     lda SPRITE_X_MSB_LOCATION                   ; Load the 9th bit sprite register
     and #%00000100                              ; use bitwise AND to zero all but Yar's bullet bit
     beq detect_bullet_and_sprite                ; bullet not on right side of screen, jump and check for sprite impacts
-check_shield_hit:
+check_bullet_shield_hit:
     lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
     and #%00000100                              ; Use bitwise AND to see if the bullet is involved with a collision
     beq detect_bullet_and_sprite                ; no shield impact, check for sprite collection
@@ -456,13 +463,29 @@ detect_bullet_and_sprite:
     ; 1) Yar hit by his bullet (He dies)
     ; 2) Bullet hits Quotile (Yar wins)
     lda SPRITE_SPRITE_COLLISIONS                ; Load the VICII register that stores sprite/sprite collisions
+    sta TEMP_STORAGE                            ; Store the collision register for later processing
     and #%00000101                              ; use bitwise AND to zero all but YAR and bullet collision flags
-    cmp #$05                                    ; If both Yar and Bullet are showing in a collision the game is over
+    sec                                         ; Set for Carry
+    sbc #$05                                    ; Subtract #5, which indicates a collision between sprites 0 and 2
+    beq Yar_Shot                                ; If result is 0 then Yar and bullet have collided, so handle the collision
+check_bullet_and_qotile:
+    lda TEMP_STORAGE                            ; Reload the collision register
+    and #%00000110                              ; Use bitwise AND to zero all but Yars bullet and Qotile coliision flags
+    sec                                         ; Set for Carry
+    sbc #$06                                    ; Subtract #6 which indicates a collision between sprites 1 and 2
+    beq Yar_Wins
+    jmp finish_bullet_animation
+Yar_Shot:
     lda #$01                                    ; Set the GAME OVER flag
     sta GAMEOVERFLAG                            ; Store the Game Over flag
     sta GAMEMESSAGEINDICATOR                    ; Set Game Lost Message for display
     jmp finishBulletImpact
-
+Yar_Wins:
+    lda #$01                                    ; Set the GAME OVER flag
+    sta GAMEOVERFLAG                            ; Store the Game Over flag
+    ldx #$00                                    ; Set game status
+    stx GAMEMESSAGEINDICATOR                    ; Set Game Won Message for display
+    jmp finishBulletImpact
 finishBulletImpact:
     rts
 
@@ -528,6 +551,7 @@ complete_irq:
 Do_User_Commands:
     jsr Process_User_Input
     jsr Move_The_Player
+    jsr DetectBulletImpacts         ; See if bullet hit anything
     jmp complete_irq
 action_screen:
     ;Set Qotile's position on the screen
@@ -540,6 +564,12 @@ action_screen:
     ;   Rotate the colors of Yar's bullet
     ;****************************************************************
 animate_bullet:
+    lda BULLET_LIVE
+    beq do_bullet_animation
+    lda #WHITE
+    sta SPRITE_2_COLOR
+    rts
+do_bullet_animation:
     lda BULLET_COLOR_COUNTER                    ; Load the animation counter for Yar's bullet
     clc                                         ; Clear the carry flag
     adc #$01                                    ; Add one to the animation counter
@@ -1412,8 +1442,8 @@ render_complete:
 !byte $01,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
 
 *=$3500
-;byte $00                           ; Game Over Flag [Memory $3500]
-;byte $08                           ; Message Length [Memory $3501]
-;byte $59, $4F, $15, $20, $17, $09, $0E, $21    ; Game Won [Memory $3502 - $3509]
-;byte $59, $4F, $15, $20, $4C, $4F, $13, $14    ; Game Lost [Memory $350A - $3511]
-;byte $00                           ; GameMessage [Memory $3512]
+!byte $00                           ; Game Over Flag [Memory $3500]
+!byte $08                           ; Message Length [Memory $3501]
+!byte $19, $0F, $15, $20, $17, $0F, $0E, $21    ; Game Won [Memory $3502 - $3509]
+!byte $19, $0F, $15, $20, $0C, $0F, $13, $14    ; Game Lost [Memory $350A - $3511]
+!byte $00                           ; GameMessage [Memory $3512]
