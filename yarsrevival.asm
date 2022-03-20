@@ -252,6 +252,10 @@ find_YAR_X_screenline:
     sta YAR_SHIELD_HIT_X_COORDINATE             ; Store the X coordinate location
     rts 
 
+    ;**************************************
+    ; Find the position on the text screen
+    ; where Yar hit the shield
+    ;**************************************
 Calculate_YAR_SHIELD_HIT_Position:
     jsr find_YAR_Y_screenline
     jsr find_YAR_X_screenline
@@ -278,9 +282,9 @@ Initialize_Sprites:
     lda YARS_Y_COORDINATE                       ; Load YARs y-coord into .A
     sta SPRITE_0_Y_COOR                         ; Set y-coor for Yar
     ;Set Yar's Bullet position
-    jsr process_bullet_horizontal_movement
-    lda BULLET_Y_COORDINATE
-    sta SPRITE_2_Y_COOR
+    jsr process_bullet_horizontal_movement      ; Process Yar's bullet x-coor
+    lda BULLET_Y_COORDINATE                     ; Load YARs bullet y-coor
+    sta SPRITE_2_Y_COOR                         ; Store the bullet location on screen
     ;Set Yar's and Qotile's color
     lda WHITE                                   ; Load the white color into .A
     sta SPRITE_0_COLOR                          ; Set YARs color
@@ -357,32 +361,34 @@ move_qotile:
     sta SPRITE_1_Y_COOR                         ; no need to update X coordinate    
     rts
 
-
+    ;****************************************************
+    ; Calculate what part of the shield should be removed
+    ;****************************************************
 RemoveShieldComponent:
-    lda YAR_SHIELD_HIT_X_COORDINATE
-    sec
-    sbc #$0f
-    sta TEMP_STORAGE 
-    lda YAR_SHIELD_HIT_Y_COORDINATE
-    sec
-    sbc SHIELD_DISPLAY_LINE_START
-    tay 
-    lda MULTIPLY_TABLE,y 
-    clc 
-    adc TEMP_STORAGE
-    tay 
+    lda YAR_SHIELD_HIT_X_COORDINATE             ; Load the text x coordinate
+    sec                                         ; Set for Carry
+    sbc #$0f                                    ; Subtract $0F (Shield starts at $0F)
+    sta TEMP_STORAGE                            ; Temporarily store the offset
+    lda YAR_SHIELD_HIT_Y_COORDINATE             ; Load the text y coordinate
+    sec                                         ; Set for Carry
+    sbc SHIELD_DISPLAY_LINE_START               ; Subtract the start text line of the shield to get how far from top of shield Yar is
+    tay                                         ; Transfer value to .Y
+    lda MULTIPLY_TABLE,y                        ; Need to multiply the verticle start line by 7 (Use lookup table)
+    clc                                         ; Clear the Carry Flag
+    adc TEMP_STORAGE                            ; Add the offset x offset to the y offset
+    tay                                         ; store the shield memory offset into .Y
     ;Check if block exists
-    lda SHIELD_BASE,y 
-    cmp #$20
-    beq DO_CALC_OFFSET
-    lda #$20
-    sta SHIELD_BASE,y
-    rts
-DO_CALC_OFFSET:
-    iny
-    lda #$20
-    sta SHIELD_BASE,y 
-    rts
+    lda SHIELD_BASE,y                           ; Load the calculated shield position from memory
+    cmp #$20                                    ; Compare the memory contents to PETSCII "Space" character
+    beq DO_CALC_OFFSET                          ; If it is a space then handle differently
+    lda #$20                                    ; Load the PETSCII "Space" character into .A
+    sta SHIELD_BASE,y                           ; Set the shield collision location to a space
+    rts                                         ; Return
+DO_CALC_OFFSET:                                 ; Calculated position is off slightly so lets make a compensation move
+    iny                                         ; Move the collision location to the right one character position
+    lda #$20                                    ; Load the PETSCII "Space" character into .A
+    sta SHIELD_BASE,y                           ; Set the shield collision location to a space
+    rts                                         ; Return
 
     ;************************************************************
     ; Detect Yar impact with background
@@ -454,23 +460,27 @@ action_screen:
     jsr Do_Screen_Animation                     ; Translate the PETSCII screen changes onto the screen
     jmp check_sprite_animation                  ; Jump back to check the sprites
 
+    ;****************************************************************
+    ; animate_bullet
+    ;   Rotate the colors of Yar's bullet
+    ;****************************************************************
 animate_bullet:
-    lda BULLET_COLOR_COUNTER
-    clc
-    adc #$01
-    sta BULLET_COLOR_COUNTER
-    cmp BULLET_COLOR_OFFSET_MAX
-    bcs finish_bullet_animation
-    tay
-    lda BULLET_COLOR_POINTER,y 
-    sta SPRITE_2_COLOR
-    rts
+    lda BULLET_COLOR_COUNTER                    ; Load the animation counter for Yar's bullet
+    clc                                         ; Clear the carry flag
+    adc #$01                                    ; Add one to the animation counter
+    sta BULLET_COLOR_COUNTER                    ; Store the new animation counter value
+    cmp BULLET_COLOR_OFFSET_MAX                 ; Compare the animation counter value to the max counter value
+    bcs finish_bullet_animation                 ; If counter is >= max then reset the counter
+    tay                                         ; Transfer .A into Y
+    lda BULLET_COLOR_POINTER,y                  ; Load the new animation color from the offset
+    sta SPRITE_2_COLOR                          ; Set the new animation color
+    rts                                         ; Return
 finish_bullet_animation:
-    lda #$00
-    sta BULLET_COLOR_COUNTER
-    lda BULLET_COLOR_POINTER
-    sta SPRITE_2_COLOR
-    rts
+    lda #$00                                    ; Reset counter to zero
+    sta BULLET_COLOR_COUNTER                    ; store zero as the new counter value
+    lda BULLET_COLOR_POINTER                    ; load the first animation color
+    sta SPRITE_2_COLOR                          ; change the bullet to the current color
+    rts                                         ; return
 
 animate_sprites:                                
     ldy #0                                      ; Reset Sprite animation counter
@@ -482,7 +492,7 @@ animate_sprites:
     iny                                         ; Move to the next higher animation frame reference
     sty YARS_CURRENT_FRAME
     cpy YARS_MAX_FRAME_OFFSET                   ; Compare the current animation frame to the max animation frame (last frame)
-    bcc move_sprites                          ; If we not have reached the end of the animation then finish
+    bcc move_sprites                            ; If we not have reached the end of the animation then finish
     ldy #0                                      ; else reset the animation frame to the start
     sty YARS_CURRENT_FRAME
 move_sprites:
@@ -496,28 +506,28 @@ finish_sprite:
 
     ;Move the bullet
 check_bullet_movement:
-    lda BULLET_LIVE
-    beq move_bullet_with_yar
-    jsr process_bullet_horizontal_movement
-    lda BULLET_X_COORDINATE
-    cmp SPRITE_MAX_X_COORDINATE
+    lda BULLET_LIVE                             ; Load the "Is the bullet live" flag
+    beq move_bullet_with_yar                    ; if the flag is false (0) then handle default movement
+    jsr process_bullet_horizontal_movement      ; Process the horizontal movement 
+    lda BULLET_X_COORDINATE                     ; Get the current x position of the bullet
+    cmp SPRITE_MAX_X_COORDINATE                 ; compare the bullet x position to the max x position on the screen
     bcc move_bullet                             ; if not at max screen location then continue
     lda #$00                                    ; Load .A with FALSE flag
-    sta BULLET_LIVE                             ; Turn Yars bullet off
-    lda #$03
-    sta BULLET_X_COORDINATE
-    jsr process_bullet_horizontal_movement
-    jmp bullet_movement_done
+    sta BULLET_LIVE                             ; Turn Yars bullet live flag off
+    lda #$03                                    ; Set the default bullet x-coordinate
+    sta BULLET_X_COORDINATE                     ; store the default x-coordinate
+    jsr process_bullet_horizontal_movement      ; Move the bullet back to the default start position
+    jmp bullet_movement_done                    ; complete the bullet move routine
 move_bullet:
-    lda BULLET_X_COORDINATE                       ; Load x-coor
+    lda BULLET_X_COORDINATE                     ; Load x-coor
     clc                                         ; Clear Carry Flag before Add with Cary
-    adc #BULLET_MOVEMENT_SPEED                    ; MAdd the speed of movement to the x-coor
-    sta BULLET_X_COORDINATE                       ; store the new x-coor
-    jmp bullet_movement_done
+    adc #BULLET_MOVEMENT_SPEED                  ; Add the speed of movement to the x-coor
+    sta BULLET_X_COORDINATE                     ; store the new x-coor
+    jmp bullet_movement_done                    ; complete the bullet move routine
 move_bullet_with_yar:
-    lda YARS_Y_COORDINATE
-    sta BULLET_Y_COORDINATE
-    sta SPRITE_2_Y_COOR
+    lda YARS_Y_COORDINATE                       ; load Yars y-coordinate
+    sta BULLET_Y_COORDINATE                     ; Set the bullet to the same y location
+    sta SPRITE_2_Y_COOR                         ; Set the y position of the bullet on the screen
 bullet_movement_done:
     rts
 
@@ -1141,29 +1151,30 @@ render_complete:
 !byte $00 ; TEMP_STORAGE [Memory Location = $3054]
 
 ; Color for Shield
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 1  (Start $3055 End $305B)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 2  (Start $305C End $3062)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 3  (Start $3063 End $3069)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 4  (Start $306A End $3070)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 5  (Start $3071 End $3077)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 6  (Start $3078 End $307E)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 7  (Start $307F End $3085)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 8  (Start $3086 End $308C)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 9  (Start $308D End $3093)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 10 (Start $3094 End $309A)
-;!byte $03, $03, $03, $03, $03, $03, $03     ; Line 11 (Start $309b End $30A1)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 1  (Start $3055 End $305B)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 2  (Start $305C End $3062)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 3  (Start $3063 End $3069)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 4  (Start $306A End $3070)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 5  (Start $3071 End $3077)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 6  (Start $3078 End $307E)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 7  (Start $307F End $3085)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 8  (Start $3086 End $308C)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 9  (Start $308D End $3093)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 10 (Start $3094 End $309A)
+!byte $06, $06, $06, $06, $06, $06, $06     ; Line 11 (Start $309b End $30A1)
 
-!byte $01, $02, $03, $05, $06, $07, $09     ; Line 1  (Start $3055 End $305B)
-!byte $09, $01, $02, $03, $05, $06, $07     ; Line 2  (Start $305C End $3062)
-!byte $07, $09, $01, $02, $03, $05, $06     ; Line 3  (Start $3063 End $3069)
-!byte $06, $07, $09, $01, $02, $03, $05     ; Line 4  (Start $306A End $3070)
-!byte $05, $06, $07, $09, $01, $02, $03     ; Line 5  (Start $3071 End $3077)
-!byte $03, $05, $06, $07, $09, $01, $02     ; Line 6  (Start $3078 End $307E)
-!byte $02, $03, $05, $06, $07, $09, $01     ; Line 7  (Start $307F End $3085)
-!byte $01, $02, $03, $05, $06, $07, $09     ; Line 8  (Start $3086 End $308C)
-!byte $09, $01, $02, $03, $05, $06, $07     ; Line 9  (Start $308D End $3093)
-!byte $07, $09, $01, $02, $03, $05, $06     ; Line 10 (Start $3094 End $309A)
-!byte $06, $07, $09, $01, $02, $03, $05     ; Line 11 (Start $309b End $30A1)
+; Test color to determine row and column
+;!byte $01, $02, $03, $05, $06, $07, $09     ; Line 1  (Start $3055 End $305B)
+;!byte $09, $01, $02, $03, $05, $06, $07     ; Line 2  (Start $305C End $3062)
+;!byte $07, $09, $01, $02, $03, $05, $06     ; Line 3  (Start $3063 End $3069)
+;!byte $06, $07, $09, $01, $02, $03, $05     ; Line 4  (Start $306A End $3070)
+;!byte $05, $06, $07, $09, $01, $02, $03     ; Line 5  (Start $3071 End $3077)
+;!byte $03, $05, $06, $07, $09, $01, $02     ; Line 6  (Start $3078 End $307E)
+;!byte $02, $03, $05, $06, $07, $09, $01     ; Line 7  (Start $307F End $3085)
+;!byte $01, $02, $03, $05, $06, $07, $09     ; Line 8  (Start $3086 End $308C)
+;!byte $09, $01, $02, $03, $05, $06, $07     ; Line 9  (Start $308D End $3093)
+;!byte $07, $09, $01, $02, $03, $05, $06     ; Line 10 (Start $3094 End $309A)
+;!byte $06, $07, $09, $01, $02, $03, $05     ; Line 11 (Start $309b End $30A1)
 
 ; Screen Base addresses for potential shield locations low_byte, high_byte pairs
 !byte $21, $04  ; Screen Address ($0421 = Line 1, Column 34 [Memory: $30A2, $30A3])
