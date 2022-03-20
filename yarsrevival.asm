@@ -119,6 +119,12 @@
     BULLET_COLOR_COUNTER                = $3126     ; Current color count offset
     BULLET_COLOR_POINTER                = $3127     ; Start of color map
     MULTIPLY_TABLE                      = $312F     ; Multiply by 7
+    GAMEOVERFLAG                        = $3500     ; Stores Game Over flag
+    GAMEMESSAGELENGTH                   = $3501     ; Length of game over message
+    GAMEWONMESSAGE                      = $3502     ; Start of game Won Message
+    GAMELOSTMESSAGE                     = $350A     ; Start of game lost Message
+    GAMEMESSAGEINDICATOR                = $3512     ; Which message to display
+
 
     ;**************************
     ; SPRITE VALUES
@@ -153,6 +159,7 @@
     SPRITE_2_X_COOR                     = $d004     ; VICII memory location to update YAR's bullet actual x screen location
     SPRITE_2_Y_COOR                     = $d005     ; VICII memory location to update YAR's bullet actual y screen location
     SPRITE_BACKGROUND_COLLISIONS        = $d01f     ; VICII register to record sprite to background collisions
+    SPRITE_SPRITE_COLLISIONS            = $d01e     ; VICII register to record sprite to sprite coliisions
 
     ;**************************
     ; System Color CONSTANTS
@@ -205,6 +212,9 @@ InitializeGame:
     ; Game Play Routine
     ;**************************
 GamePlay:
+    ; Check if game is over
+    lda GAMEOVERFLAG                ; Load .A with Game Over flag
+    bne Quit_Game                   ; Goto Quit_Game if game has ended
     lda SCREEN_UPDATE_OCCURRED      ; Check if the PETSCII screen has been updated
     cmp #1                          ; If the screen was updated during an interupt
     bne process_updates             ; process the next animation frame                                    
@@ -217,6 +227,30 @@ check_screen_update:
     ldy #1                          ; Mark the PETSCII Screen as being updated in memory
     sty SCREEN_UPDATE_OCCURRED
     jmp GamePlay
+
+Quit_Game:
+    ; Display Game Over Message
+    ldy #0                          ; Set message counter to zero
+    lda GAMEMESSAGEINDICATOR        ; Load message indicator
+    beq DisplayWin                  ; Jump to win message
+DisplayLoss:
+    lda GAMELOSTMESSAGE,y           ; Get character to display
+    sta $056B,y                     ; Store the character in screen memory
+    iny                             ; Increase the message counter
+    cpy GAMEMESSAGELENGTH           ; Check if message is completely displayed
+    bcs Complete_Game               ; If displayed then quit
+    jmp DisplayLoss                 ; Keep displaying
+DisplayWin:
+    lda GAMEWONMESSAGE,y            ; Get character to display
+    sta $056B,y                     ; Store the character in screen memory
+    iny                             ; Increase the message counter
+    cpy GAMEMESSAGELENGTH           ; Check if message is completely displayed
+    bcs Complete_Game               ; If displayed then quit
+    jmp DisplayWin                  ; Keep displaying
+Complete_Game:
+    lda RANDOM_NUMBER               ; Load a random number for color
+    sta BORDER_COLOR                ; Set the border color to the random color
+    jmp Complete_Game
 
 
     ;**************************
@@ -390,6 +424,50 @@ DO_CALC_OFFSET:                                 ; Calculated position is off sli
     sta SHIELD_BASE,y                           ; Set the shield collision location to a space
     rts                                         ; Return
 
+
+
+    ;***********************************************************
+    ; Detect Bullet Impacts
+    ; If the bullet impacts the neutral zone nothing happens
+    ; If the bullet impacts the shield, then reset the bullet
+    ; If the bullet hits Yar, game over
+    ; If the bullet hits Qotile, then win
+    ;***********************************************************
+DetectBulletImpacts:
+    ; Check for background impact
+    ; Yar's bullet can not impact the neutral zone so we can check
+    ; the SPRITE_X_MSB_LOCATION to detect what to do
+    lda SPRITE_X_MSB_LOCATION                   ; Load the 9th bit sprite register
+    and #%00000100                              ; use bitwise AND to zero all but Yar's bullet bit
+    beq detect_bullet_and_sprite                ; bullet not on right side of screen, jump and check for sprite impacts
+check_shield_hit:
+    lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
+    and #%00000100                              ; Use bitwise AND to see if the bullet is involved with a collision
+    beq detect_bullet_and_sprite                ; no shield impact, check for sprite collection
+    ; Shield hit destroys bullet and resets it
+    lda #$00                                    ; Load .A with FALSE flag
+    sta BULLET_LIVE                             ; Turn Yars bullet live flag off
+    lda #$03                                    ; Set the default bullet x-coordinate
+    sta BULLET_X_COORDINATE                     ; store the default x-coordinate
+    jsr process_bullet_horizontal_movement      ; Move the bullet back to the default start position
+    jmp finishBulletImpact                      ; Bullet has been reset, jump back
+detect_bullet_and_sprite:
+    ; Two conditions to check here
+    ; 1) Yar hit by his bullet (He dies)
+    ; 2) Bullet hits Quotile (Yar wins)
+    lda SPRITE_SPRITE_COLLISIONS                ; Load the VICII register that stores sprite/sprite collisions
+    and #%00000101                              ; use bitwise AND to zero all but YAR and bullet collision flags
+    cmp #$05                                    ; If both Yar and Bullet are showing in a collision the game is over
+    lda #$01                                    ; Set the GAME OVER flag
+    sta GAMEOVERFLAG                            ; Store the Game Over flag
+    sta GAMEMESSAGEINDICATOR                    ; Set Game Lost Message for display
+    jmp finishBulletImpact
+
+finishBulletImpact:
+    rts
+
+
+
     ;************************************************************
     ; Detect Yar impact with background
     ; If impact detected then shoot Yar behind the neutral line
@@ -407,9 +485,6 @@ check_shield_hit:
     lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
     and #%00000001                              ; Use bitwise AND to see if Yar is involved in a collision
     beq finishBackgroundHit                     ; if zero flags not set then no collision
-    ; Simple test to turn border yellow if hit
-    ;lda #YELLOW
-    ;sta BORDER_COLOR
     lda SHIELD_BUMP                             ; Load .A with current Shield bump value
     bne complete_bump_setup                     ; If bump is already started then return else set the value
     lda #$01                                    ; Load .A with an "On" value (1)
@@ -1163,19 +1238,6 @@ render_complete:
 !byte $06, $06, $06, $06, $06, $06, $06     ; Line 10 (Start $3094 End $309A)
 !byte $06, $06, $06, $06, $06, $06, $06     ; Line 11 (Start $309b End $30A1)
 
-; Test color to determine row and column
-;!byte $01, $02, $03, $05, $06, $07, $09     ; Line 1  (Start $3055 End $305B)
-;!byte $09, $01, $02, $03, $05, $06, $07     ; Line 2  (Start $305C End $3062)
-;!byte $07, $09, $01, $02, $03, $05, $06     ; Line 3  (Start $3063 End $3069)
-;!byte $06, $07, $09, $01, $02, $03, $05     ; Line 4  (Start $306A End $3070)
-;!byte $05, $06, $07, $09, $01, $02, $03     ; Line 5  (Start $3071 End $3077)
-;!byte $03, $05, $06, $07, $09, $01, $02     ; Line 6  (Start $3078 End $307E)
-;!byte $02, $03, $05, $06, $07, $09, $01     ; Line 7  (Start $307F End $3085)
-;!byte $01, $02, $03, $05, $06, $07, $09     ; Line 8  (Start $3086 End $308C)
-;!byte $09, $01, $02, $03, $05, $06, $07     ; Line 9  (Start $308D End $3093)
-;!byte $07, $09, $01, $02, $03, $05, $06     ; Line 10 (Start $3094 End $309A)
-;!byte $06, $07, $09, $01, $02, $03, $05     ; Line 11 (Start $309b End $30A1)
-
 ; Screen Base addresses for potential shield locations low_byte, high_byte pairs
 !byte $21, $04  ; Screen Address ($0421 = Line 1, Column 34 [Memory: $30A2, $30A3])
 !byte $49, $04  ; Screen Address ($0449 = Line 2, Column 34 [Memory: $30A4, $30A5])
@@ -1348,3 +1410,10 @@ render_complete:
 !byte $01,$80,$02,$02,$00,$02,$04,$00,$01,$04,$00,$00,$fc,$00,$00,$3c
 !byte $00,$00,$3c,$00,$00,$3f,$00,$00,$20,$80,$00,$20,$40,$00,$40,$40
 !byte $01,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
+
+*=$3500
+;byte $00                           ; Game Over Flag [Memory $3500]
+;byte $08                           ; Message Length [Memory $3501]
+;byte $59, $4F, $15, $20, $17, $09, $0E, $21    ; Game Won [Memory $3502 - $3509]
+;byte $59, $4F, $15, $20, $4C, $4F, $13, $14    ; Game Lost [Memory $350A - $3511]
+;byte $00                           ; GameMessage [Memory $3512]
