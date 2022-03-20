@@ -618,6 +618,23 @@ Yar_Wins:
 finishBulletImpact:
     rts
 
+    ;****************************************************
+    ; Detect if SWIRL kills Yar
+    ; Check if SWIRL impacts with YAR, and if so kill YAR
+    ; and end the game
+    ;****************************************************
+DetectSwirlKillYar:
+    lda SWIRL_CHASE                             ; Load the SWIRL Chase flag
+    beq no_kill_chance                          ; If the SWIRL Chase flag is zero then swirl isn't chasing and cant kill
+    lda SPRITE_SPRITE_COLLISIONS                ; Load the VICII register for sprite to sprite collisions
+    and #%00000011                              ; Isolate YAR and SWIRL impact codes (bullet and missle don't impact here)
+    cmp #$03                                    ; Check the value >= 3 (should never be higher) then we have an impact
+    bcc no_kill_chance                          ; If less than 3 then return
+    lda #$01                                    ; Load flag for game over and loss
+    sta GAMEOVERFLAG
+    sta GAMEMESSAGEINDICATOR
+no_kill_chance:
+    rts                                         ; Return
 
 
     ;************************************************************
@@ -717,10 +734,16 @@ finish_bullet_animation:
     sta SPRITE_2_COLOR                          ; change the bullet to the current color
     rts                                         ; return
 
+    ;****************************************************************
+    ; animate_sprites
+    ;   Put animation into the moving sprites
+    ;****************************************************************
 animate_sprites:                                
     ldy #0                                      ; Reset Sprite animation counter
     sty SPRITE_INTERUPT_COUNTER
+    ;-------------
     ; Animate Yar
+    ;------------
     ldy YARS_CURRENT_FRAME                      ; Get Yar's current animation frame
     lda YARS_ANIMATION_BASE,y                   ; Load .A with the current animation frame  
     sta YARS_SPRITE_POINTER                     ; Tell VICII chip to load the current animation frame
@@ -731,10 +754,11 @@ animate_sprites:
     ldy #0                                      ; else reset the animation frame to the start
     sty YARS_CURRENT_FRAME
 animate_swirl:
-    ; Add code to animate Swirl
+    ;--------------
+    ; Animate Swirl
+    ;--------------
     lda SWIRL_LIVE                              ; Load the SWIRL Live flag to .A
     beq ShowQotile                              ; if not set then go to move sprites
-    ;Animate Swirl
     ldy SWIRL_CURRENT_FRAME                     ; Get SWIRL's current frame
     lda SWIRL_ANIMATION_BASE,y                  ; Load .A with the current animation frame
     sta QOTILE_SPRITE_POINTER                   ; Ensure Qotile becomes the SWIRL
@@ -791,11 +815,13 @@ update_swirl_x:
     jsr process_swirl_horizontal_movement       ; Set SWIRL Location
     lda SWIRL_Y_COORDINATE                      ; Set SWIRL Y location
     sta SPRITE_1_Y_COOR
+    jsr DetectSwirlKillYar
     jmp finish_SWIRL_movement
 turn_off_swirl:                                 ; Turn off the SWIRL and retrun to Qotile
     lda #$00                                    ; Load zero value for flags
     sta SWIRL_CHASE                             ; Set SWIRL Chase to false
     sta SWIRL_LIVE                              ; Set SWIRL Live to false
+    sta DISABLE_FIRE_BUTTON                     ; Turn on Fire Button
     lda #$CD                                    ; Set the sprite pointer back to Qotile
     sta QOTILE_SPRITE_POINTER
     lda QOTILE_Y_COORDINATE                     ; load quotile's Y coord back into defaults
@@ -809,7 +835,9 @@ turn_off_swirl:                                 ; Turn off the SWIRL and retrun 
 finish_SWIRL_movement:
     rts
 
+    ;----------------
     ;Move the bullet
+    ;----------------
 check_bullet_movement:
     lda BULLET_LIVE                             ; Load the "Is the bullet live" flag
     beq move_bullet_with_yar                    ; if the flag is false (0) then handle default movement
@@ -1167,6 +1195,7 @@ irq:
 swirl_chase_set:
     lda #$01                        ; Set flag to True
     sta SWIRL_CHASE                 ; Save the flag into SWIRL CHASE
+    sta DISABLE_FIRE_BUTTON         ; Turn off the fire button
 skip_swirl_irq:
     jsr ProcessIRQ
     jsr animate_bullet
