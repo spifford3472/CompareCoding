@@ -74,17 +74,21 @@
     YARS_SPRITE_POINTER                 = $07f8     ; VICII Chip memory location to store the current animation frame
     QOTILE_SPRITE_POINTER               = $07f9     ; VICII Chip memory location to store Qotile
     BULLET_SPRITE_POINTER               = $07fa     ; VICII Chip memory location to store YAR's BULLET
+    MISSLE_SPRITE_POINTER               = $07fb     ; VICII Chip memory location to store Missle
     SPRITE_0_X_COOR                     = $d000     ; VICII memory location to update YARs actual x screen position
     SPRITE_0_Y_COOR                     = $d001     ; VICII memory location to update YARs actual y screen position
     SPRITE_0_COLOR                      = $d027     ; VICII memory location to store YAR's color
     SPRITE_1_COLOR                      = $d028     ; VICII memory location to store QOTILE's color
     SPRITE_2_COLOR                      = $d029     ; VICII memory location to store YAR's bullet color
+    SPRITE_3_COLOR                      = $d02a     ; VICII memory location to store Qotiles missle color
     SPRITE_MODE                         = $d01c     ; VICII memory location to denote each sprites HI-RES or MULTICOLOR value
     SPRITE_X_MSB_LOCATION               = $d010     ; VICII memory location for sprite horizontal 9th bit
     SPRITE_1_X_COOR                     = $d002     ; VICII memory location to update QOTILE's actual x screen position
     SPRITE_1_Y_COOR                     = $d003     ; VICII memory location to update QOTILE's actual y screen position
     SPRITE_2_X_COOR                     = $d004     ; VICII memory location to update YAR's bullet actual x screen location
     SPRITE_2_Y_COOR                     = $d005     ; VICII memory location to update YAR's bullet actual y screen location
+    SPRITE_3_X_COOR                     = $d006     ; VICII memory location to update Qotiles Missle actual x location
+    SPRITE_3_Y_COOR                     = $d007     ; VICII memory location to update Qotiles Missle actual y location
     SPRITE_BACKGROUND_COLLISIONS        = $d01f     ; VICII register to record sprite to background collisions
     SPRITE_SPRITE_COLLISIONS            = $d01e     ; VICII register to record sprite to sprite coliisions
 
@@ -130,7 +134,8 @@
     ; Sprite Movement 
     ;***********************
     YARS_MOVEMENT_SPEED                 = $03       ; Controls many pixels YAR moves with each user input
-    BULLET_MOVEMENT_SPEED               = $04       ; Controls how many pixels Yar's bullet moves (was 6)
+    BULLET_MOVEMENT_SPEED               = $04       ; Controls how many pixels Yar's bullet moves 
+    MISSLE_MOVEMENT_SPEED               = $01       ; COntrols how many pixels Qotile's missle moves
     SPRITE_MAX_X_COORDINATE             = $30D4     ; Since we move sprites in 2 pixel steps, we limit the x-coordinate
 
     ;*****************
@@ -154,8 +159,6 @@
     ; Caluclation Lookups
     ;********************
     MULTIPLY_TABLE                      = $312F     ; Lookup table to track multiples of 7 to avoid doing multiplication routine
-
-  
 
     ;*****************************
     ; Game Over Constants
@@ -208,7 +211,6 @@
     USER_INPUT_COUNTER                  = $311A     ; The number of screen interupts that have occurred since the last user update
     SWIRL_INTERUPT_COUNTER              = $3515     ; The number of screen interupts that have occurred since the last SWIRL creation check
          
-
     ;***********************
     ; Player Tracking Values
     ;***********************
@@ -250,7 +252,8 @@
     BULLET_Y_COORDINATE                 = $3123     ; Memory location to store YAR's bullet actual y screen position
     SWIRL_X_COORDINATE                  = $3519     ; Memory location to store SWIRL's X Coordinate
     SWIRL_Y_COORDINATE                  = $351A     ; Memory location to store SWIRL's Y Coordinate
-
+    MISSLE_X_COORDINATE                 = $3526     ; Memory Location to store Missle's X Coordinate
+    MISSLE_Y_COORDINATE                 = $3527     ; Memory Location to store Missle's Y Coordinate
 
  
 ;===================================================================
@@ -420,8 +423,10 @@ Initialize_Sprites:
     sta QOTILE_SPRITE_POINTER                   ; Store the sprite memory offset for Qotile
     lda #$cb                                    ; Load YAR's BULLET sprite memory offset
     sta BULLET_SPRITE_POINTER                   ; Store the sprite memory offset for YAR's BULLET
+    lda #$cc                                     ; Load Missle sprite memory offset
+    sta MISSLE_SPRITE_POINTER                   ; Store the sprite memory offset for MISSLE
     ;Turn on Sprites
-    lda #$07                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
+    lda #$0F                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
     sta $d015                                   ; Tell the VICII chip which sprites to enable
     ;Set Yar's position on the screen
     jsr process_sprite_horizontal_movemement    ; Process YARs X-Coor
@@ -436,7 +441,9 @@ Initialize_Sprites:
     sta SPRITE_0_COLOR                          ; Set YARs color
     sta SPRITE_1_COLOR                          ; Set Qotile's color
     sta SPRITE_2_COLOR                          ; Set YAR's BULLET color
-    ;Set Yar to HiRes
+    lda BLUE                                    ; Load Blue color into .A
+    sta SPRITE_3_COLOR                          ; Set MISSLE color
+    ;Set Sprites to HiRes
     lda #0                                      ; load Hires value to .A
     sta SPRITE_MODE                             ; Store .A into sprite mode
     ;Set Qotile's initial position
@@ -451,8 +458,17 @@ Initialize_Sprites:
     ;Set Qotiles's 9th bit for x position
     lda SPRITE_X_MSB_LOCATION
     ora #%00000010                              ; Use bit-wise OR to set the bit for sprite 1
-    jmp complete_horizontal_movement
-    sta SPRITE_X_MSB_LOCATION    
+    sta SPRITE_X_MSB_LOCATION 
+    jsr complete_horizontal_movement
+    ;Set Missle start location
+    lda MISSLE_X_COORDINATE
+    asl
+    sta SPRITE_3_X_COOR
+    lda MISSLE_Y_COORDINATE
+    sta SPRITE_3_Y_COOR
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00001000                              ; Use bit-wise OR to set the bit for sprite 3
+    sta SPRITE_X_MSB_LOCATION
     rts
 
 
@@ -1726,3 +1742,5 @@ render_complete:
 !byte $78                           ; SWIRL countdown reset value [Memory: $3523]
 !byte $00                           ; SWIRL Chase flag [Memory: $3524]
 !byte $9C                           ; DEFAULT_SWIRL_LOCATION [Memory: $3525]
+!byte $8F                           ; Default Missle X location [Memory: $3526]
+!byte $30                           ; Default Missle Y location [Memory: $3527]
