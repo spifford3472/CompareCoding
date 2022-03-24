@@ -15,6 +15,11 @@
 ;     issues the basic command SYS xxxx, to instruct the system to start executing at memory address xxxx
 ;===========================================================================================================
 
+;==================================================
+; Load initial source files 
+;    These files contain no executable code
+;    They are used to group labels for readability
+;=================================================
 !source "basicboot.asm"
 !source "includes.asm"
 
@@ -27,12 +32,14 @@
 +start_at $1000
 
 
-
- 
 ;===================================================================
 ; Main Game Code
 ;===================================================================
- 
+START_GAME:
+    jmp InitializeGame
+
+
+
     ;**************************
     ; Initialize Game
     ;**************************
