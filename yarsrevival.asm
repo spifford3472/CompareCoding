@@ -254,6 +254,8 @@
     SWIRL_Y_COORDINATE                  = $351A     ; Memory location to store SWIRL's Y Coordinate
     MISSLE_X_COORDINATE                 = $3526     ; Memory Location to store Missle's X Coordinate
     MISSLE_Y_COORDINATE                 = $3527     ; Memory Location to store Missle's Y Coordinate
+    MISSLE_X_DIRECTION                  = $3528     ; Memory location to store Missle's x direction
+    MISSLE_Y_DIRECTION                  = $3529     ; Memory location to store Missle's y direction
 
  
 ;===================================================================
@@ -414,6 +416,9 @@ Calculate_YAR_SHIELD_HIT_Position:
     ;**************************
     ; Intialize the Sprites
     ;   Sprite 0 - Yar
+    ;   Sprite 1 - Qotile/Swirl
+    ;   Sprite 2 - Yar's Cannon
+    ;   Sprite 3 - Guided Missle
     ;**************************
 Initialize_Sprites:
     ;Set YARs Sprite Pointers    (Sprites are $40 bytes, offset $C5 means sprite at $40*$C5=$3140)
@@ -573,6 +578,84 @@ Quick_Check_Bullet_Collision:
     jsr bullet_hit_shield
 stop_quick_check:
     rts
+
+
+    ;***********************************
+    ; Guided Missle
+    ; Process the guided missle movement
+    ;***********************************
+    ;Check if fire button is disable
+    ;  If yes then must be in neutral zone, so keep missle moving till boundry then bounce a direction
+    ;  If no, calculate the quickest x and y movememnt toward Yar and move 1 pixel in both x and y
+move_missle:
+    lda DISABLE_FIRE_BUTTON
+    beq track_yar
+make_move:
+    jmp calculateMisslePosition
+track_yar:
+    ; check if yar location compare to missle then move
+    lda YARS_X_COORDINATE
+    cmp MISSLE_X_COORDINATE
+    bcc missleleft
+    ldx #$00
+    stx MISSLE_X_DIRECTION
+    jmp track_yar_y
+missleleft:
+    ldx #$01
+    stx MISSLE_X_DIRECTION
+track_yar_y:
+    lda YARS_Y_COORDINATE
+    cmp MISSLE_Y_COORDINATE
+    bcc missleup
+    ldx #$00
+    stx MISSLE_Y_DIRECTION
+    jmp calculateMisslePosition
+missleup:
+    ldx #$01
+    stx MISSLE_Y_DIRECTION
+calculateMisslePosition:
+    ldx MISSLE_X_COORDINATE
+    lda MISSLE_X_DIRECTION
+    beq movemissleright
+    dex 
+    stx MISSLE_X_COORDINATE
+    cpx #$03
+    bcc reversemisslex
+    jmp misslechecky
+movemissleright:
+    inx 
+    stx MISSLE_X_COORDINATE
+    cpx SPRITE_MAX_X_COORDINATE
+    bcs reversemisslex
+    jmp misslechecky
+reversemisslex:
+    lda MISSLE_X_DIRECTION
+    eor #$01
+    sta MISSLE_X_DIRECTION
+misslechecky:
+    ldx MISSLE_Y_COORDINATE
+    lda MISSLE_Y_DIRECTION
+    beq movemissledown
+    dex 
+    stx MISSLE_Y_COORDINATE
+    cpx #$30
+    bcc reversemissley
+    jmp misslemovefinish
+movemissledown:
+    inx 
+    stx MISSLE_Y_COORDINATE
+    cpx #$e7
+    bcc misslemovefinish
+reversemissley:
+    lda MISSLE_Y_DIRECTION
+    eor #$01
+    sta MISSLE_Y_DIRECTION
+misslemovefinish:
+    lda MISSLE_Y_COORDINATE
+    sta SPRITE_3_Y_COOR
+    jsr process_missle_horizontal_movemement
+    rts
+
 
     ;***********************************************************
     ; Detect Bullet Impacts
@@ -954,6 +1037,21 @@ complete_swirl_horizontal_movement:
     sta SPRITE_X_MSB_LOCATION
     rts
 
+process_missle_horizontal_movemement:
+    lda MISSLE_X_COORDINATE                     ; Load Missle's x-coordinate
+    asl                                         ; double the coordinate
+    sta SPRITE_3_X_COOR                         ; store the result in the proper X register
+    bcc clear_missle_ninth_bit                  ; If carry flag from doubling is clear, don't set 9th bit
+    ;Set missle's 9th bit
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00001000                              ; Use bit-wise OR to set the bit for sprite 3
+    jmp complete_missle_horizontal_movement
+clear_missle_ninth_bit:
+    lda SPRITE_X_MSB_LOCATION
+    and #%11110111                              ; Use bit-wise AND to unset the bit for sprite 3
+complete_missle_horizontal_movement:
+    sta SPRITE_X_MSB_LOCATION                   ; Store .A into X-MSB location for 9th bit
+    rts
 
 Move_The_Player:
     ;Move YAR
@@ -1061,6 +1159,7 @@ do_the_move_up:
     sta BULLET_Y_COORDINATE
     sta SPRITE_2_Y_COOR
 complete_user_input:
+    jsr move_missle
     jsr DetectYarBackgroundHit
     rts                                         ; Return to calling procedure
 
@@ -1744,3 +1843,5 @@ render_complete:
 !byte $9C                           ; DEFAULT_SWIRL_LOCATION [Memory: $3525]
 !byte $8F                           ; Default Missle X location [Memory: $3526]
 !byte $30                           ; Default Missle Y location [Memory: $3527]
+!byte $01                           ; Missle's x direction [Memory: $3528]
+!byte $01                           ; Missle's y direction [Memory: $3529]
