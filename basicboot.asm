@@ -5,14 +5,16 @@
 ; Modified By: Geoffrey Kline
 ; Changes:
 ;           Feb 10,2022 - Created
+; Purpose:
+;       Write a BASIC start routine at the start of BASIC program 
+; memory.  Once the code is loaded into memory the user can 
+; issue a BASIC "run" command in order to execute the compiled
+; machine language code
+;            Allows user to enter:
+;               LOAD "YARSREVICAL.PRG",8,1
+;               RUN
 ;===================================================================
 
-;===================================================================
-; Write BASIC start routine
-; Allows user to enter:
-;       LOAD "YARSREVICAL.PRG",8,1
-;       RUN
-;===================================================================
 !MACRO start_at .address {
     *=$0801         ; Start at the begiining of BASIC program memory
     !byte $0c, $08, $e6, $07, $9e, $20

@@ -48,3 +48,25 @@
     SPRITE_3_Y_COOR                     = $d007     ; VICII memory location to update Qotiles Missle actual y location
     SPRITE_BACKGROUND_COLLISIONS        = $d01f     ; VICII register to record sprite to background collisions
     SPRITE_SPRITE_COLLISIONS            = $d01e     ; VICII register to record sprite to sprite coliisions
+
+    ;********************************
+    ; IRQ Registers
+    ;********************************
+    VIC_CR                              = $D011     ; VIC Control Register
+    READ_WRITE_RASTER                   = $D012     ; Read Raster / Write Raster Value for Compare
+    VIC_IFLAG_REGISTER                  = $D019     ; VIC Interrupt Flag Register (Bit = 1: IRQ	Occurred)
+    IRQ_MASK_REGISTER_1                 = $D01A     ; IRQ Mask Register: 1 = Interrupt Enabled
+
+    ;********************************
+    ; SID (Sound) Registers
+    ; MOS 6581 Sound Interface Device
+    ;********************************
+    V3FC_LB                             = $D40E	    ; Voice 3: Frequency Control - Low-Byte
+    V3FC_HB                             = $D40F	    ; Voice 3: Frequency Control - High-Byte
+    V3CR                                = $D412     ; Voice 3: Control Register
+    CIA_CR                              = $DC0D	    ; CIA Interrupt Control Register (Read IRQs/Write Mask)
+    CIA_CR2                             = $DD0D     ; CIA Interrupt Control Register (Read NMls/Write Mask)
+
+    TRANSFER_VECTOR_IRQ_HI              = $FFFE     ; IRQ (Hi-Byte)
+    TRANSFER_VECTOR_IRQ_LO              = $FFFF     ; IRQ (Lo-Byte)
+    
