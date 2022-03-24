@@ -154,6 +154,7 @@
     YARS_MAX_FRAME_OFFSET               = $310F     ; Number of animation frames used for YAR
     SWIRL_ANIMATION_BASE                = $351b     ; Base memory containing offsets for SWIRL's animation
     SWIRL_MAX_FRAME_OFFSET              = $3521     ; Number of animation frames used for SWIRL
+    MISSLE_MOVE_TRIGGER                 = $352B     ; Number of interupts before moving the missle
 
     ;********************
     ; Caluclation Lookups
@@ -210,6 +211,7 @@
     SPRITE_ANIMATION_TRIGGER            = $3113     ; The number of screen interupts to occur before updating the sprites
     USER_INPUT_COUNTER                  = $311A     ; The number of screen interupts that have occurred since the last user update
     SWIRL_INTERUPT_COUNTER              = $3515     ; The number of screen interupts that have occurred since the last SWIRL creation check
+    MISSLE_INTERUPT_COUNTER             = $352A     ; The number of screen interupts that have occurred since the last missle move
          
     ;***********************
     ; Player Tracking Values
@@ -292,6 +294,7 @@ GamePlay:
     ; Check if game is over
     lda GAMEOVERFLAG                ; Load .A with Game Over flag
     bne Quit_Game                   ; Goto Quit_Game if game has ended
+    jsr CheckMissleMove
     ; Check for Screen update
     lda SCREEN_UPDATE_OCCURRED      ; Check if the PETSCII screen has been updated
     cmp #1                          ; If the screen was updated during an interupt
@@ -340,6 +343,16 @@ Set_Swirl_On:
     ldx SWIRL_COUNTDOWN_RESET_VALUE ; Load value into .X for the SWIRL to wait to launch
     stx SWIRL_COUNTDOWN             ; put the .X value into the Swirl launch countdown
     jmp GamePlay
+
+CheckMissleMove:
+    lda MISSLE_INTERUPT_COUNTER
+    cmp MISSLE_MOVE_TRIGGER
+    bcc complete_missle_check
+    lda #$00
+    sta MISSLE_INTERUPT_COUNTER
+    jsr move_missle
+complete_missle_check:
+    rts
 
     ;****************************************
     ; QUIT GAME
@@ -1159,7 +1172,6 @@ do_the_move_up:
     sta BULLET_Y_COORDINATE
     sta SPRITE_2_Y_COOR
 complete_user_input:
-    jsr move_missle
     jsr DetectYarBackgroundHit
     rts                                         ; Return to calling procedure
 
@@ -1297,6 +1309,9 @@ irq:
     ldy USER_INPUT_COUNTER          ; Load the User Input counter
     iny                             ; Increase the User Input counter
     sty USER_INPUT_COUNTER          ; Store the user Input counter
+    ldy MISSLE_INTERUPT_COUNTER     ; Load the missle movement interupt counter
+    iny
+    sty MISSLE_INTERUPT_COUNTER
     ldy SWIRL_INTERUPT_COUNTER      ; Load the SWIRL counter
     iny                             ; Increase the SWIRL counter
     sty SWIRL_INTERUPT_COUNTER      ; Store the SWIRL Interupt counter
@@ -1845,3 +1860,5 @@ render_complete:
 !byte $30                           ; Default Missle Y location [Memory: $3527]
 !byte $01                           ; Missle's x direction [Memory: $3528]
 !byte $01                           ; Missle's y direction [Memory: $3529]
+!byte $00                           ; Missle's interrupt counter [Memory: $352A]
+!byte $0a                           ; Missle's intrupt trigger value [Memory: $352B]
