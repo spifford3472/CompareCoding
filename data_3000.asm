@@ -99,10 +99,6 @@
 !byte $ac, $07  ; Screen Address ($07ac = Line 24, Column 34 [Memory: $3104, $3105])
 !byte $d4, $07  ; Screen Address ($07d4 = Line 25, Column 34 [Memory: $3106, $3107])
 
-; CREATE VARIABLES FOR THESE
-; ReWRITE DELAY LOOP TO TRIGGER EVENTS OFF SCREEN INTERUPT (1/60 sec)
-; Put YAR on screen
-; Read Joystick
 !byte $c5, $c6, $c7, $c8, $c9, $ca  ; Yar's animation frames [Memory: $3108-$310D]
 !byte $00                           ; Yar's current animation frame [Memory: $310E]
 !byte $06                           ; Yar's max animation frame [Memory: $310F]
