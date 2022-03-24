@@ -2,7 +2,8 @@
 ;                                         Yars' Revival
 ;                                  (c)2022 by Geoffrey Kline
 ;
-; A resonable clone of game "Yar's Revenge". Originally coded by Howard Scott Warshaw in 1982 for Atari.
+; A resonable POC of game "Yar's Revenge". Originally coded by Howard Scott Warshaw in 1982 for Atari.
+; Purpose of this code is to demonstrate the differences between technology of 1982 and 2022
 ;===========================================================================================================
 ; Coding Notes:
 ;   * Commodore 64 was manufactured between 1982 and 1992
@@ -14,29 +15,13 @@
 ;     issues the basic command SYS xxxx, to instruct the system to start executing at memory address xxxx
 ;===========================================================================================================
 
-;===================================================================
-; Write BASIC start routine
-; Allows user to enter:
-;       LOAD "YARSREVICAL.PRG",8,1
-;       RUN
-;===================================================================
-!MACRO start_at .address {
-    *=$0801         ; Start at the begiining of BASIC program memory
-    !byte $0c, $08, $e6, $07, $9e, $20
-    ; $0c $08 = $080c = 2-byte pointer to the next line of the BASIC program
-    ; $e6 $07 = $07e6 = 2-byte line number ($07e6 = 2022)
-    ; $9e = BASIC token for SYS command
-    ; $20 = PETSCII character code for a <space>
-    !if .address >= 10000 { !byte 48 + ((.address / 10000) % 10) }
-    !if .address >=  1000 { !byte 48 + ((.address /  1000) % 10) }
-    !if .address >=   100 { !byte 48 + ((.address /   100) % 10) }
-    !if .address >=    10 { !byte 48 + ((.address /    10) % 10) }
-    !byte $30 + (.address % 10), $00, $00, $00
-    ; $30 + (.address % 10) = PETSCII encoded numbers for decimal starting location
-    ; $00 = End of Basic Line
-    ; $00 $00 = $0000 = Pointer to the next line of BASIC code ($0000=End Of Program)
-    *=.address
-}
+;==================================================
+; Load initial source files 
+;    These files contain no executable code
+;    They are used to group labels for readability
+;=================================================
+!source "basicboot.asm"
+!source "includes.asm"
 
 ;===================================================================
 ; Load the program into memory start at $0800
@@ -46,129 +31,127 @@
 ;===================================================================
 +start_at $1000
 
-;===================================================================
-; Define constants for the game
-;===================================================================
-    ;**************************
-    ; Screen Memory Locations
-    ;**************************
-    BACKGROUND_COLOR                    = $d021     ; Background color location
-    BORDER_COLOR                        = $d020     ; Border color location
-    SCREENRAM                           = $0400     ; Location of screen ram
-    COLOR_RAM_BASE                      = 54272     ; Location of color ram
 
-    ;**************************
-    ; Memory Constants
-    ;**************************
-    ZP                                  = $FB       ; ZeroPage Memory Area
-
-    ;**************************
-    ; SHIELD DRAW CONSTANTS
-    ;**************************
-    SHIELD_SCREEN_POSITION_LOW_BYTE     = $304D     ; Memory location of low byte for drawing shield to screen
-    SHIELD_SCREEN_POSITION_HIGH_BYTE    = $304E     ; Memory location of high byte for drawing shield to screen 
-    MAX_SCREEN_LINES                    = 24        ; Maximum number of Text lines to draw (zero based)
-    NUM_SHIELD_LINES                    = 10        ; Number of lines in actual shield (zero based)
-    SCREEN_BASE_OFFSET                  = $30A2     ; Memory location where screen location bytes are stored for shield
-    COLOR_SHIELD_BASE                   = $3055     ; Memory location where shield color is stored
-    SHIELD_BASE                         = $3000     ; Memory where PETSCII shield graphics are stored
-    CURRENT_SCREEN_LINE                 = $304F     ; Stores current line number being processed
-    TEMP_OFFSET                         = $3050     ; Location to temporarily store offset calculation results
-    SHIELD_DISPLAY_LINE_START           = $3051     ; Screen line where shield should start to render
-    DRAW_SHIELD                         = $3052     ; Boolean to trigger drawing of shield instead of blank line
-    DRAW_SHIELD_LINE                    = $3053     ; Track what line of the shield is being drawn
-    ZP_COLOR_BASE                       = $2F       ; Zero Page location to put base of color map for drawing
-    ZP_SHIELD_BASE                      = $31       ; Zero Page location to put base of shield map for drawing
-    TEMP_STORAGE                        = $3054     ; Temporary memory storage
-
-    ;***************************
-    ; Neutral Zone
-    ;***************************
-    NEUTRAL_ZONE_OFFSET                 = $30D6     ; Where the neutral zone is defined in memory
-    NEUTRAL_SCREEN_START                = $0414     ; Start the neutral zone at screen location 1044              
-    NEUTRAL_SCR_POS_LOW_BYTE            = $304D     ; Memory location of low byte for drawing shield to screen
-    NEUTRAL_SCR_POS_HIGH_BYTE           = $304E     ; Memory location of high byte for drawing shield to screen
-
-    ;**************************
-    ; INTERUPT VALUES
-    ;**************************
-    MAX_SHIELD_LINE                     = $0e       ; What is the max screen line the shield can be rendered on
-    MIN_SHIELD_LINE                     = $00       ; What is the top-most line the shield can be rendered on
-    SHIELD_DIRECTION                    = $30D5     ; Specifies which direction the shield on the screen is moving
-
-    ;**************************
-    ; OTHER VALUES
-    ;**************************
-    RANDOM_NUMBER                       = $D41B     ; Memory location to read a psuedo random number from
-    SCREEN_INTERUPT_COUNTER             = $3110     ; The number of screen interupts that have occurred since the last screen update
-    SCREEN_ANIMATION_TRIGGER            = $3111     ; The number of screen interupts to occur before updating the PETSCII art on the screen
-    SPRITE_INTERUPT_COUNTER             = $3112     ; The number of screen interupts that have occurred since the last Sprite update
-    SPRITE_ANIMATION_TRIGGER            = $3113     ; The number of screen interupts to occur before updating the sprites
-    SCREEN_UPDATE_OCCURRED              = $3114     ; Tracks whether the CPU has updated the PETSCII art to be drawn
-    CLRHOM                              = $E544     ; Commodore 64 Kernal Location of Clear Screen
-    GAMEPORT2                           = $DC00     ; Commodore 64 GamePort 2 location
-    USER_INPUT_COUNTER                  = $311A     ; The number of screen interupts that have occurred since the last user update
-    USER_INPUT_TRIGGER                  = $311B     ; The number of screen interupts to occur before updating the user input
-    YARS_MOVEMENT_SPEED                 = $03       ; Controls many pixels YAR moves with each user input
-    SHIELD_BUMP                         = $3120     ; Shield Bump in Progress (0=No 1=Yes)
-    BUMP_DISTANCE_LEFT                  = $3121     ; Distance remaining on the shield bump
-    BUMP_DISTANCE_SETTING               = $08       ; Distance for bump to move left
-
-    ;**************************
-    ; SPRITE VALUES
-    ;**************************
-    YARS_ANIMATION_BASE                 = $3108     ; Base memory location containing offsets for YAR's animation
-    YARS_CURRENT_FRAME                  = $310E     ; Current YAR animation frame
-    YARS_MAX_FRAME_OFFSET               = $310F     ; Number of animation frames used for YAR
-    YARS_SPRITE_POINTER                 = $07f8     ; VICII Chip memory location to store the current animation frame
-    QOTILE_SPRITE_POINTER               = $07f9     ; VICII Chip memory location to store Qotile
-    YARS_X_COORDINATE                   = $3115     ; Memory location to store YAR'S X-coordinate on screen
-    YARS_Y_COORDINATE                   = $3116     ; Memory location to store YAR'S Y-coordinate on screen
-    SPRITE_0_X_COOR                     = $d000     ; VICII memory location to update YARs actual x screen position
-    SPRITE_0_Y_COOR                     = $d001     ; VICII memory location to update YARs actual y screen position
-    SPRITE_0_COLOR                      = $d027     ; VICII memory location to store YAR's color
-    SPRITE_1_COLOR                      = $d028     ; VICII memory location to store QOTILE's color
-    SPRITE_MODE                         = $d01c     ; VICII memory location to denote each sprites HI-RES or MULTICOLOR value
-    SPRITE_X_MSB_LOCATION               = $D010     ; VICII memory location for sprite horizontal 9th bit
-    SPRITE_MAX_X_COORDINATE             = $30D4     ; Since we move sprites in 2 pixel steps, we limit the x-coordinate
-    JOYSTICK_X                          = $3117     ; Players X Input value
-    JOYSTICK_Y                          = $3118     ; Players Y Input Value
-    JOYSTICK_FIRE                       = $3119     ; Players Fire Input Value
-    YARS_SCREEN_POSITION_Y              = $311C     ; YARS screen text position - Y
-    YARS_SCREEN_POSITION_X              = $311D     ; YARS screen text position - X
-    QOTILE_X_COORDINATE                 = $311E     ; Memory location to Qotile's X-coordinate on screen
-    QOTILE_Y_COORDINATE                 = $311F     ; Memory location to Qotile's Y-coordinate on screen
-    SPRITE_1_X_COOR                     = $d002     ; VICII memory location to update QOTILE's actual x screen position
-    SPRITE_1_Y_COOR                     = $d003     ; VICII memory location to update QOTILE's actual y screen position
-    SPRITE_BACKGROUND_COLLISIONS        = $d01f     ; VICII register to record sprite to background collisions
-
-    ;**************************
-    ; System Color CONSTANTS
-    ;**************************
-    BLACK               = $00
-    WHITE               = $01
-    RED                 = $02
-    CYAN                = $03
-    PURPLE              = $04
-    GREEN               = $05
-    BLUE                = $06
-    YELLOW              = $07
-    ORANGE              = $08
-    BROWN               = $09
-    PINK                = $0a
-    DARKGRAY            = $0b
-    GRAY                = $0c 
-    LIGHTGREEN          = $0d
-    LIGHTBLUE           = $0e
-    LIGHTGRAY           = $0f
- 
 ;===================================================================
 ; Main Game Code
 ;===================================================================
- 
-    ;**************************
+START_GAME:
+    jmp InitializeGame
+
+;===================================================================
+; Random numbers need to be seeded
+;   A simple way to generate a random number on the
+;   Commodore 64 is to generate white noise from the
+;   sound (SID) chip and ensure no sound is output
+;   then just read the current value of of the noise signal
+;===================================================================
+Setup_Random_Number:
+    ;Initialize the SID (sound) chip to generate a noise pattern for Random numbers
+    ; Random numbers can be found by looking in $d41b
+    lda #$ff              ; Set the maximum frequency value
+    sta V3FC_LB           ; Set voice 3 frequency low byte
+    sta V3FC_HB           ; Set voice 3 frequency high byte
+    lda #$80              ; Noise waveform, gate bit off (don't play sound)
+    sta V3CR              ; set the voice 3 control register
+    rts
+
+;===================================================================
+; Define Interupt for screen writing
+;   In NA the old TV signal as NTSC which runs on a 60 Hz signal
+;   This means that old televisions updated the screen 60 times
+;   per second.  Since I want graphics to be smooth, I can't
+;   update the screen while it is in the middle of being drawn
+;   or else I'll see partial updates.  To fix this I wait
+;   till the screen draw gets to the bottom of the updateable 
+;   screen (just above the bottom border) before I update the
+;   screen memory
+;===================================================================
+interupts:
+    sei                             ; disable the maskable IRQs
+    lda #$7f                
+    sta CIA_CR                      ; disable timer interrupts which can be generated by the two CIA chips    
+    sta CIA_CR2                     ; the kernel uses such an interrupt to flash the cursor, scan keyboard, etc
+    lda CIA_CR                      ; by reading these registers we negate any pending CIA irqs
+    lda CIA_CR2                     ; if we don't do this, a pending CIA irq might occur after we finish 
+                                    ; setting up this code, and we don't want that
+    lda #$01                        ; This is how we tell VICII graphics chip to generate raster interrupt
+    sta IRQ_MASK_REGISTER_1
+    lda #$7f                        ; We want to break about half way down (race the beam) to gove extra cycles to draw
+    sta READ_WRITE_RASTER 
+    lda #$1b                        ; as there are more than 256 rasterlines, the topmost bit of $d011 serves
+    sta VIC_CR                      ; as the 9th bit for the rasterline we want our IRQ to be triggered
+    lda #$35                        ; we turn off the BASIC and KERNAL rom here
+    sta $01                         ; the cpu now sees RAM everywhere except $d000-$e000
+                                    ; where the register;SID;VICII/etc are still visible
+    lda #<irq                       ; Setup the address of my interrupt code
+    sta TRANSFER_VECTOR_IRQ_HI      ; Transfer Vector
+    lda #>irq
+    sta TRANSFER_VECTOR_IRQ_LO      ; Transfer Vector
+    cli                             ; Enable maskable interrupts again
+    rts
+
+    ;==================================================================================
+    ; irq 
+    ;    Interupt code to execute.
+    ; Being that all kernal irq handles switched off we have to handle a few more 
+    ; functions by ourselves.  The registers are not saved and when control is handed
+    ; back the executing code will expect the registers to contain what they did when 
+    ; control was flipped to the interrupt.  We must save and restore these values
+    ;==================================================================================
+irq:
+    pha                             ; Store register .A into the stack
+    txa                             ; Transfer .X into .A
+    pha                             ; Store register .A into the stack
+    tya                             ; Transfer .Y into .A
+    pha                             ; Store register .A into the stack
+    lda #$ff                        ; Clean way of clearing the interrupt condition of the VICII
+    sta VIC_IFLAG_REGISTER          ; Inform the VICII that we acknowledged the interrupt, to prevent being reraised
+    ldy SCREEN_INTERUPT_COUNTER     ; Load the Screen Aninmation Counter
+    iny                             ; Increase the Screen Animation Counter
+    sty SCREEN_INTERUPT_COUNTER     ; Store the Screen Animation Counter
+    ldy SPRITE_INTERUPT_COUNTER     ; Load the Sprite animation counter
+    iny                             ; Increase the sprite animation counter
+    sty SPRITE_INTERUPT_COUNTER     ; Store the sprite animation counter
+    ldy USER_INPUT_COUNTER          ; Load the User Input counter
+    iny                             ; Increase the User Input counter
+    sty USER_INPUT_COUNTER          ; Store the user Input counter
+    ldy MISSLE_INTERUPT_COUNTER     ; Load the missle movement interupt counter
+    iny
+    sty MISSLE_INTERUPT_COUNTER
+    ldy SWIRL_INTERUPT_COUNTER      ; Load the SWIRL counter
+    iny                             ; Increase the SWIRL counter
+    sty SWIRL_INTERUPT_COUNTER      ; Store the SWIRL Interupt counter
+    lda SWIRL_LIVE                  ; Load the SWIRL Live flag
+    beq skip_swirl_irq              ; If flag is not set don't compute countdown to fire 
+    ldx SWIRL_COUNTDOWN             ; Load the current SWIRL fire countdown timer
+    beq swirl_chase_set
+    dex                             ; Decrement the counter by 1
+    stx SWIRL_COUNTDOWN             ; Store .X for SWIRL Countdown
+    jmp skip_swirl_irq
+swirl_chase_set:
+    lda #$01                        ; Set flag to True
+    sta SWIRL_CHASE                 ; Save the flag into SWIRL CHASE
+    sta DISABLE_FIRE_BUTTON         ; Turn off the fire button
+skip_swirl_irq:
+    jsr ProcessIRQ
+    jsr animate_bullet
+    jsr check_bullet_movement
+    jsr check_SWIRL_movement
+    ;clear sprite to background collision flag to clear erronous hits
+    ;register holds value till it is read
+    lda SPRITE_BACKGROUND_COLLISIONS
+    pla                             ; Restore Y register from stack (Remeber stack is LIFO: Last In First Out)
+    tay                             ; Transfer .A to .Y
+    pla                             ; Restore X register from stack
+    tax                             ; Transfer .A to .X
+    pla                             ; Restore .A from the stack
+    rti                             ; Return from interrupt
+
+    ;******************************************************************************************************************
+    ;******************************************************************************************************************
     ; Initialize Game
-    ;**************************
+    ;******************************************************************************************************************
+    ;******************************************************************************************************************    
 InitializeGame:
     ;Initialize Random Numbers
     jsr Setup_Random_Number         ; Intialize process to generate psuedo random numbers
@@ -189,13 +172,34 @@ InitializeGame:
     jsr interupts                   ; Initialize the screen interupt
     jmp GamePlay                    ; Jump to main gameplay loop
 
-    ;**************************
-    ; Game Play Routine
-    ;**************************
+
+    ;******************************************************************************************************************
+    ;******************************************************************************************************************
+    ; Main Game Play Routine
+    ;     This is the main game play loop.  This loop continues till game is over.
+    ;   Only code not called from this loop is time sensitive animation drawing code, which executes via
+    ;   a screen interupt.
+    ;******************************************************************************************************************
+    ;******************************************************************************************************************
 GamePlay:
+    ; Check if game is over
+    lda GAMEOVERFLAG                ; Load .A with Game Over flag
+    bne Quit_Game                   ; Goto Quit_Game if game has ended
+    jsr CheckMissleMove
+    ; Check for Screen update
     lda SCREEN_UPDATE_OCCURRED      ; Check if the PETSCII screen has been updated
     cmp #1                          ; If the screen was updated during an interupt
     bne process_updates             ; process the next animation frame                                    
+    ; Check for SWIRL
+    lda SWIRL_LIVE                  ; Load if SWIRL is active flag
+    beq do_swirl_checks             ; If the SWIRL Live flag is false, check if it is time for the SWIRL
+    lda #0                          ; SWIRL must be live so reset the swirl counter
+    sta SWIRL_INTERUPT_COUNTER      ; Save the updated SWIRL counter
+    jmp GamePlay
+do_swirl_checks:
+    lda SWIRL_INTERUPT_COUNTER      ; Load the current SWIRL Interupt counter
+    cmp SWIRL_CHECK_TRIGGER         ; subtract trigger value
+    bcs Check_Swirl_Create          ; Need to see if a Swirl is created
     jmp GamePlay                    ; else loop
 process_updates:
     jsr check_screen_update         ; Special coding to get RTS to work correctly (INVESTIGATE::IS THIS REALLY NEEDED)
@@ -205,115 +209,122 @@ check_screen_update:
     ldy #1                          ; Mark the PETSCII Screen as being updated in memory
     sty SCREEN_UPDATE_OCCURRED
     jmp GamePlay
+Check_Swirl_Create:
+    lda #$00                        ; Reset the SWIRL interupt counter
+    sta SWIRL_INTERUPT_COUNTER      ; Store the reset SWIRL INTERUPT counter
+    lda RANDOM_NUMBER               ; obtain a new random number
+    cmp SWIRL_THRESHOLD             ; compare the SWIRL trigger number to the random number
+    bpl Try_To_Swirl                ; If the random number is >= SWIRL threshold, then we attempt to SWIRL
+    jmp GamePlay
+Try_To_Swirl:
+    ldy SWIRL_RUN_COUNT             ; Load the number of attempts make to SWIRL
+    iny                             ; Increase the attempt number
+    sta SWIRL_RUN_COUNT             ; Store the SWIRL attempt count
+    lda SWIRL_RUN_COUNT             ; Load the SWIRL attempt count into .A
+    cmp #$02                        ; Have we attempted at least twice
+    bpl Set_Swirl_On                ; If Yes the allow the SWIRL
+    jmp GamePlay
+Set_Swirl_On:
+    lda #$00                        ; Reset the SWIRL attempts to zero
+    sta SWIRL_RUN_COUNT
+    lda RANDOM_NUMBER               ; Obtain a new random number and put into 
+    sta SWIRL_THRESHOLD             ;   the SWIRL threshold
+    lda #$01                        ; Set the SWIRL Live flag to True
+    sta SWIRL_LIVE
+    ldx SWIRL_COUNTDOWN_RESET_VALUE ; Load value into .X for the SWIRL to wait to launch
+    stx SWIRL_COUNTDOWN             ; put the .X value into the Swirl launch countdown
+    jmp GamePlay
+
+    ;****************************************
+    ; QUIT GAME
+    ; Display the win or loss message
+    ;****************************************
+Quit_Game:
+    ; Display Game Over Message
+    ldy #0                          ; Set message counter to zero
+    lda GAMEMESSAGEINDICATOR        ; Load message indicator
+    beq DisplayWin                  ; Jump to win message
+DisplayLoss:
+    lda GAMELOSTMESSAGE,y           ; Get character to display
+    sta $056B,y                     ; Store the character in screen memory
+    iny                             ; Increase the message counter
+    cpy GAMEMESSAGELENGTH           ; Check if message is completely displayed
+    bcs Complete_Game               ; If displayed then quit
+    jmp DisplayLoss                 ; Keep displaying
+DisplayWin:
+    lda GAMEWONMESSAGE,y            ; Get character to display
+    sta $056B,y                     ; Store the character in screen memory
+    iny                             ; Increase the message counter
+    cpy GAMEMESSAGELENGTH           ; Check if message is completely displayed
+    bcs Complete_Game               ; If displayed then quit
+    jmp DisplayWin                  ; Keep displaying
+Complete_Game:
+    lda RANDOM_NUMBER               ; Load a random number for color
+    sta BORDER_COLOR                ; Set the border color to the random color
+    jmp Complete_Game
 
 
-    ;**************************
-    ; Mathmatical Formulas
-    ; *************************
-
-    ;***************************************
-    ; Calculate screen line yar is occupying
-    ;***************************************
-    ; Implement screen_line_y = INT((yar_y_position-50)/8)+2
-find_YARS_Y_screenline:
-    lda YARS_Y_COORDINATE                       ; Load the y-coord value of YAR
-    sec                                         ; Set carry flag for subtraction
-    sbc #50                                     ; Subtract #50
-    lsr                                         ; Divide by 2, 3 times by shifting 
-    lsr                                         ; bits to get value/2^3
-    lsr 
-    clc                                         ; Clear Carry Flag before Add with Cary
-    adc #2                                      ; Add 2 to the equation to offset for sprite looks
-    sta YARS_SCREEN_POSITION_Y                  ; Store the Y coordinate location
-    rts 
-
-    ; Implement screen_line_x = INT((yar_y_position-50)/8)+2
-find_YARS_X_screenline:
-    lda YARS_X_COORDINATE                       ; Load the y-coord value of YAR
-    sec                                         ; Set carry flag for subtraction
-    sbc #24                                     ; Subtract #24
-    lsr                                         ; Divide by 2, 3 times by shifting 
-    lsr                                         ; bits to get value/2^3
-    lsr 
-    clc                                         ; Clear Carry Flag before Add with Cary
-    adc #2                                      ; Add 2 to the equation to offset for sprite looks
-    sta YARS_SCREEN_POSITION_X                  ; Store the X coordinate location
-    rts 
-
-Calculate_YARS_Character_Position:
-    jsr find_YARS_Y_screenline
-    jsr find_YARS_X_screenline
-    rts 
-
-
-    ;**************************
+    ;*************************************************************
     ; Intialize the Sprites
     ;   Sprite 0 - Yar
-    ;**************************
+    ;   Sprite 1 - Qotile/Swirl
+    ;   Sprite 2 - Yar's Cannon
+    ;   Sprite 3 - Guided Missle
+    ;*************************************************************
 Initialize_Sprites:
     ;Set YARs Sprite Pointers    (Sprites are $40 bytes, offset $C5 means sprite at $40*$C5=$3140)
     lda YARS_ANIMATION_BASE                     ; Load Yar's sprite memory offset (NOTE: this is $C5 in the above calculation)
     sta YARS_SPRITE_POINTER                     ; Store the sprite memory offset for Yar
     lda #$cd                                    ; Load Qotiles sprite memory offset
     sta QOTILE_SPRITE_POINTER                   ; Store the sprite memory offset for Qotile
+    lda #$cb                                    ; Load YAR's BULLET sprite memory offset
+    sta BULLET_SPRITE_POINTER                   ; Store the sprite memory offset for YAR's BULLET
+    lda #$cc                                     ; Load Missle sprite memory offset
+    sta MISSLE_SPRITE_POINTER                   ; Store the sprite memory offset for MISSLE
     ;Turn on Sprites
-    lda #$03                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
+    lda #$0F                                    ; Set which sprites to enable on the screen 1=sprite zero, etc
     sta $d015                                   ; Tell the VICII chip which sprites to enable
     ;Set Yar's position on the screen
     jsr process_sprite_horizontal_movemement    ; Process YARs X-Coor
     lda YARS_Y_COORDINATE                       ; Load YARs y-coord into .A
     sta SPRITE_0_Y_COOR                         ; Set y-coor for Yar
+    ;Set Yar's Bullet position
+    jsr process_bullet_horizontal_movement      ; Process Yar's bullet x-coor
+    lda BULLET_Y_COORDINATE                     ; Load YARs bullet y-coor
+    sta SPRITE_2_Y_COOR                         ; Store the bullet location on screen
     ;Set Yar's and Qotile's color
     lda WHITE                                   ; Load the white color into .A
     sta SPRITE_0_COLOR                          ; Set YARs color
     sta SPRITE_1_COLOR                          ; Set Qotile's color
-    ;Set Yar to HiRes
+    sta SPRITE_2_COLOR                          ; Set YAR's BULLET color
+    lda BLUE                                    ; Load Blue color into .A
+    sta SPRITE_3_COLOR                          ; Set MISSLE color
+    ;Set Sprites to HiRes
     lda #0                                      ; load Hires value to .A
     sta SPRITE_MODE                             ; Store .A into sprite mode
     ;Set Qotile's initial position
     lda QOTILE_Y_COORDINATE                     ; Load Qotiles Y coordinste into .A
     sta SPRITE_1_Y_COOR                         ; Store y-coordinate for Qotile
     ;Set Qotiles X coordinate using 9th bit
-    lda QOTILE_X_COORDINATE                     ; Load YAR'S x-coordinate
+    lda DEFAULT_SWIRL_LOCATION
+    sta SWIRL_X_COORDINATE
+    sta QOTILE_X_COORDINATE
     asl                                         ; double the coordinate
     sta SPRITE_1_X_COOR
-    ;Set Yar's 9th bit for x position
+    ;Set Qotiles's 9th bit for x position
     lda SPRITE_X_MSB_LOCATION
     ora #%00000010                              ; Use bit-wise OR to set the bit for sprite 1
-    jmp complete_horizontal_movement
-    sta SPRITE_X_MSB_LOCATION    
-    rts
-
-
-    ;*************************************
-    ; Process movement of Qotile's Shield
-    ;*************************************
-process_movement:
-    ;Shield movement
-    ldx SHIELD_DIRECTION                        ; Load the direction the shield should be moving
-    cpx #1                                      ; Check if up or down
-    bne moveup                                  ; If moving up jump to that section of code else continue
-movedown:
-    ldy SHIELD_DISPLAY_LINE_START               ; Load the screen line number that the shield begins to be displayed
-    cpy #MAX_SHIELD_LINE                        ; Compare the current shield start line number to the max shield start line number
-    bne movedown1                               ; if not equal jump to code to move the shield down on the screen
-    ldx #0                                      ; else lets change the direction of the shield
-    stx SHIELD_DIRECTION                        
-    rts 
-movedown1:
-    iny                                         ; increase the shield start postion on the screen
-    sty SHIELD_DISPLAY_LINE_START               ; Store the new start position in memory
-    rts  
-moveup:
-    ldy SHIELD_DISPLAY_LINE_START               ; Load the screen line number that the shield begins to be displayed
-    cpy #MIN_SHIELD_LINE                        ; Compare the current shield start line number to the min shield start line number
-    bne moveup1                                 ; if not equal jump to code to move the shield up on the screen
-    ldx #1                                      ; else lets change the direction of the shield
-    stx SHIELD_DIRECTION
-    rts
-moveup1:
-    dey                                         ; decrease the shield start postion on the screen
-    sty SHIELD_DISPLAY_LINE_START               ; Store the new start position in memory
+    sta SPRITE_X_MSB_LOCATION 
+    jsr complete_horizontal_movement
+    ;Set Missle start location
+    lda MISSLE_X_COORDINATE
+    asl
+    sta SPRITE_3_X_COOR
+    lda MISSLE_Y_COORDINATE
+    sta SPRITE_3_Y_COOR
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00001000                              ; Use bit-wise OR to set the bit for sprite 3
+    sta SPRITE_X_MSB_LOCATION
     rts
 
     ;***********************************************
@@ -334,8 +345,223 @@ qotile_moveup:
     sbc #$08                                    ; Reduce Qotile's y-coor by 8 pixels
     sta QOTILE_Y_COORDINATE
 move_qotile:
+    lda SWIRL_CHASE                             ; Load the SWIRL Chase flag
+    beq use_qotile
+    lda SWIRL_Y_COORDINATE
+    sta SPRITE_1_Y_COOR
+use_qotile:
     lda QOTILE_Y_COORDINATE                     ; Qotile only moves in the y axis, so 
     sta SPRITE_1_Y_COOR                         ; no need to update X coordinate    
+    sta SWIRL_Y_COORDINATE                      ; Keep Qotile and Swirl on Same Y coordindate
+    rts
+
+    ;****************************************************
+    ; Calculate what part of the shield should be removed
+    ;****************************************************
+RemoveShieldComponent:
+    lda YAR_SHIELD_HIT_X_COORDINATE             ; Load the text x coordinate
+    sec                                         ; Set for Carry
+    sbc #$0f                                    ; Subtract $0F (Shield starts at $0F)
+    sta TEMP_STORAGE                            ; Temporarily store the offset
+    lda YAR_SHIELD_HIT_Y_COORDINATE             ; Load the text y coordinate
+    sec                                         ; Set for Carry
+    sbc SHIELD_DISPLAY_LINE_START               ; Subtract the start text line of the shield to get how far from top of shield Yar is
+    tay                                         ; Transfer value to .Y
+    lda MULTIPLY_TABLE,y                        ; Need to multiply the verticle start line by 7 (Use lookup table)
+    clc                                         ; Clear the Carry Flag
+    adc TEMP_STORAGE                            ; Add the offset x offset to the y offset
+    tay                                         ; store the shield memory offset into .Y
+    ;Check if block exists
+    lda SHIELD_BASE,y                           ; Load the calculated shield position from memory
+    cmp #$20                                    ; Compare the memory contents to PETSCII "Space" character
+    beq DO_CALC_OFFSET                          ; If it is a space then handle differently
+    lda #$20                                    ; Load the PETSCII "Space" character into .A
+    sta SHIELD_BASE,y                           ; Set the shield collision location to a space
+    rts                                         ; Return
+DO_CALC_OFFSET:                                 ; Calculated position is off slightly so lets make a compensation move
+    iny                                         ; Move the collision location to the right one character position
+    lda #$20                                    ; Load the PETSCII "Space" character into .A
+    sta SHIELD_BASE,y                           ; Set the shield collision location to a space
+    rts                                         ; Return
+
+
+Quick_Check_Bullet_Collision:
+    lda BULLET_LIVE
+    beq stop_quick_check
+    lda SPRITE_X_MSB_LOCATION                   ; Load the 9th bit sprite register
+    and #%00000100                              ; use bitwise AND to zero all but Yar's bullet bit
+    beq stop_quick_check                        ; bullet not on right side of screen, stop check
+    lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
+    and #%00000100                              ; Use bitwise AND to see if the bullet is involved with a collision
+    beq stop_quick_check                        ; no shield impact, stop check
+    jsr bullet_hit_shield
+stop_quick_check:
+    rts
+
+    ;**********************************************************************************
+    ;**********************************************************************************
+    ; Guided Missle Code
+    ;   The processes handle the guided missle
+    ;**********************************************************************************
+    ;**********************************************************************************
+
+    ; Check if the missile needs to move
+CheckMissleMove:
+    lda MISSLE_INTERUPT_COUNTER                 ; Check the missile movement counter based on interupts
+    cmp MISSLE_MOVE_TRIGGER                     ; Has the threshold of the missle movement been reached
+    bcc complete_missle_check                   ; If not reached then exit, and return
+    lda #$00                                    ; The limit was reached so reset the counter
+    sta MISSLE_INTERUPT_COUNTER                 ; Store the updated counter
+    jsr move_missle                             ; Call subroutine to move tthe missile on the screen
+complete_missle_check:
+    rts
+
+    ; Move the missile
+move_missle:
+    lda DISABLE_FIRE_BUTTON                     ; Load Fire Button Status (If disabled then Yar is in the neutral zone)
+    beq track_yar                               ; If not disabled then move the missile towards Yar's current location
+make_move:                                      ; If Yar is hiding in the neutral zone then
+    jmp calculateMisslePosition                 ; Calculate the next missile move (last trajectory)
+track_yar:
+    ; check if yar location compare to missle then move
+    lda YARS_X_COORDINATE                       ; Compare missile to Yar's X-Coordinate
+    cmp MISSLE_X_COORDINATE
+    bcc missleleft
+    ldx #$00                                    ; Mark direction of missle to the right
+    stx MISSLE_X_DIRECTION
+    jmp track_yar_y
+missleleft:                                     ; Mark direction of missle to the left
+    ldx #$01
+    stx MISSLE_X_DIRECTION
+track_yar_y:                                    ; Compare missle to Yar's Y-Coordinate
+    lda YARS_Y_COORDINATE
+    cmp MISSLE_Y_COORDINATE
+    bcc missleup
+    ldx #$00                                    ; Mark direction of missle to move down
+    stx MISSLE_Y_DIRECTION
+    jmp calculateMisslePosition
+missleup:                                       ; Mark direction of missle to move up
+    ldx #$01
+    stx MISSLE_Y_DIRECTION
+calculateMisslePosition:                        ; Apply direction to the guided missile
+    ldx MISSLE_X_COORDINATE
+    lda MISSLE_X_DIRECTION
+    beq movemissleright
+    dex 
+    stx MISSLE_X_COORDINATE
+    cpx #$03
+    bcc reversemisslex
+    jmp misslechecky
+movemissleright:
+    inx 
+    stx MISSLE_X_COORDINATE
+    cpx SPRITE_MAX_X_COORDINATE
+    bcs reversemisslex
+    jmp misslechecky
+reversemisslex:
+    lda MISSLE_X_DIRECTION
+    eor #$01
+    sta MISSLE_X_DIRECTION
+misslechecky:
+    ldx MISSLE_Y_COORDINATE
+    lda MISSLE_Y_DIRECTION
+    beq movemissledown
+    dex 
+    stx MISSLE_Y_COORDINATE
+    cpx #$30
+    bcc reversemissley
+    jmp misslemovefinish
+movemissledown:
+    inx 
+    stx MISSLE_Y_COORDINATE
+    cpx #$e7
+    bcc misslemovefinish
+reversemissley:
+    lda MISSLE_Y_DIRECTION
+    eor #$01
+    sta MISSLE_Y_DIRECTION
+misslemovefinish:
+    lda MISSLE_Y_COORDINATE
+    sta SPRITE_3_Y_COOR
+    jsr process_missle_horizontal_movemement
+    rts
+
+    ;********************************************************
+    ; Detect Missle Impact
+    ; Handle when the Missle hits Yar
+    ;********************************************************
+DetectMissleImpact:
+    lda SPRITE_SPRITE_COLLISIONS                ; Load the VICII register that stores sprite/sprite collisions
+    and #%00001001                              ; use bitwise AND to zero all but YAR and Missile collision flags
+    sec                                         ; Set for Carry
+    sbc #$09                                    ; Subtract #9, which indicates a collision between sprites 0 and 3
+    beq missile_hit_yar
+    rts
+missile_hit_yar:
+    lda #$01                                    ; Set the GAME OVER flag
+    sta GAMEOVERFLAG                            ; Store the Game Over flag
+    sta GAMEMESSAGEINDICATOR                    ; Set Game Lost Message for display
+    rts
+   
+
+    ;***********************************************************
+    ; Detect Bullet Impacts
+    ; If the bullet impacts the neutral zone nothing happens
+    ; If the bullet impacts the shield, then reset the bullet
+    ; If the bullet hits Yar, game over
+    ; If the bullet hits Qotile, then win
+    ;***********************************************************
+DetectBulletImpacts:
+    ; Ignore if bullet is not live
+    lda BULLET_LIVE
+    beq finishBulletImpact                      ; Jump out if bullet is not live
+    ; Check for background impact
+    ; Yar's bullet can not impact the neutral zone so we can check
+    ; the SPRITE_X_MSB_LOCATION to detect what to do
+    lda SPRITE_X_MSB_LOCATION                   ; Load the 9th bit sprite register
+    and #%00000100                              ; use bitwise AND to zero all but Yar's bullet bit
+    beq detect_bullet_and_sprite                ; bullet not on right side of screen, jump and check for sprite impacts
+check_bullet_shield_hit:
+    lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
+    and #%00000100                              ; Use bitwise AND to see if the bullet is involved with a collision
+    beq detect_bullet_and_sprite                ; no shield impact, check for sprite collection
+    ; Shield hit destroys bullet and resets it
+bullet_hit_shield:
+    lda #$00                                    ; Load .A with FALSE flag
+    sta BULLET_LIVE                             ; Turn Yars bullet live flag off
+    lda #$03                                    ; Set the default bullet x-coordinate
+    sta BULLET_X_COORDINATE                     ; store the default x-coordinate
+    jsr process_bullet_horizontal_movement      ; Move the bullet back to the default start position
+    jmp finishBulletImpact                      ; Bullet has been reset, jump back
+detect_bullet_and_sprite:
+    ; Two conditions to check here
+    ; 1) Yar hit by his bullet (He dies)
+    ; 2) Bullet hits Quotile (Yar wins)
+    lda SPRITE_SPRITE_COLLISIONS                ; Load the VICII register that stores sprite/sprite collisions
+    sta TEMP_STORAGE                            ; Store the collision register for later processing
+    and #%00000101                              ; use bitwise AND to zero all but YAR and bullet collision flags
+    sec                                         ; Set for Carry
+    sbc #$05                                    ; Subtract #5, which indicates a collision between sprites 0 and 2
+    beq Yar_Shot                                ; If result is 0 then Yar and bullet have collided, so handle the collision
+check_bullet_and_qotile:
+    lda TEMP_STORAGE                            ; Reload the collision register
+    and #%00000110                              ; Use bitwise AND to zero all but Yars bullet and Qotile coliision flags
+    sec                                         ; Set for Carry
+    sbc #$06                                    ; Subtract #6 which indicates a collision between sprites 1 and 2
+    beq Yar_Wins
+    jmp finish_bullet_animation
+Yar_Shot:
+    lda #$01                                    ; Set the GAME OVER flag
+    sta GAMEOVERFLAG                            ; Store the Game Over flag
+    sta GAMEMESSAGEINDICATOR                    ; Set Game Lost Message for display
+    jmp finishBulletImpact
+Yar_Wins:
+    lda #$01                                    ; Set the GAME OVER flag
+    sta GAMEOVERFLAG                            ; Store the Game Over flag
+    ldx #$00                                    ; Set game status
+    stx GAMEMESSAGEINDICATOR                    ; Set Game Won Message for display
+    jmp finishBulletImpact
+finishBulletImpact:
     rts
 
 
@@ -355,25 +581,25 @@ DetectYarBackgroundHit:
 check_shield_hit:
     lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
     and #%00000001                              ; Use bitwise AND to see if Yar is involved in a collision
-    beq finishBackgroundHit                     ; if zero flags not et then no collision
-    ; Simple test to turn border yellow if hit
-    ;lda #YELLOW
-    ;sta BORDER_COLOR
+    beq finishBackgroundHit                     ; if zero flags not set then no collision
     lda SHIELD_BUMP                             ; Load .A with current Shield bump value
     bne complete_bump_setup                     ; If bump is already started then return else set the value
     lda #$01                                    ; Load .A with an "On" value (1)
     sta SHIELD_BUMP                             ; Turn on shield Bump
+    jsr Calculate_YAR_SHIELD_HIT_Position       ; Calculate where YAR hit the shield
+    jsr RemoveShieldComponent                   ; Remove the part of the shield hit
 complete_bump_setup:
     rts 
 checkNeutralZoneHit:   
     lda SPRITE_BACKGROUND_COLLISIONS            ; Load the VICII register that stores sprite/background collisions
     and #%00000001                              ; Use bitwise AND to see if Yar is involved in a collision
     beq finishBackgroundHit                     ; if zero flags not et then no collision
-    ; Simple test to turn border yellow if hit
-    lda #RED
-    sta BORDER_COLOR
+    lda #$01                                    ; Disable the fire button if in the neutral zone
+    sta DISABLE_FIRE_BUTTON                     ; Store the flag update
     rts                              
 finishBackgroundHit:
+    lda #$00                                    ; Reenable the fire button
+    sta DISABLE_FIRE_BUTTON                     ; Store the fire button update
     lda #BLUE
     sta BORDER_COLOR
     rts 
@@ -400,35 +626,193 @@ complete_irq:
 Do_User_Commands:
     jsr Process_User_Input
     jsr Move_The_Player
+    jsr DetectBulletImpacts                     ; See if bullet hit anything
+    jsr DetectMissleImpact                      ; See if missile hit yar
     jmp complete_irq
 action_screen:
     ;Set Qotile's position on the screen
     jsr Calculate_Qotile_Position
     jsr Do_Screen_Animation                     ; Translate the PETSCII screen changes onto the screen
     jmp check_sprite_animation                  ; Jump back to check the sprites
+
+    ;****************************************************************
+    ; animate_bullet
+    ;   Rotate the colors of Yar's bullet
+    ;****************************************************************
+animate_bullet:
+    lda BULLET_LIVE
+    beq do_bullet_animation
+    lda #WHITE
+    sta SPRITE_2_COLOR
+    rts
+do_bullet_animation:
+    lda BULLET_COLOR_COUNTER                    ; Load the animation counter for Yar's bullet
+    clc                                         ; Clear the carry flag
+    adc #$01                                    ; Add one to the animation counter
+    sta BULLET_COLOR_COUNTER                    ; Store the new animation counter value
+    cmp BULLET_COLOR_OFFSET_MAX                 ; Compare the animation counter value to the max counter value
+    bcs finish_bullet_animation                 ; If counter is >= max then reset the counter
+    tay                                         ; Transfer .A into Y
+    lda BULLET_COLOR_POINTER,y                  ; Load the new animation color from the offset
+    sta SPRITE_2_COLOR                          ; Set the new animation color
+    rts                                         ; Return
+finish_bullet_animation:
+    lda #$00                                    ; Reset counter to zero
+    sta BULLET_COLOR_COUNTER                    ; store zero as the new counter value
+    lda BULLET_COLOR_POINTER                    ; load the first animation color
+    sta SPRITE_2_COLOR                          ; change the bullet to the current color
+    rts                                         ; return
+
+    ;****************************************************************
+    ; animate_sprites
+    ;   Put animation into the moving sprites
+    ;****************************************************************
 animate_sprites:                                
     ldy #0                                      ; Reset Sprite animation counter
     sty SPRITE_INTERUPT_COUNTER
+    ;-------------
     ; Animate Yar
+    ;------------
     ldy YARS_CURRENT_FRAME                      ; Get Yar's current animation frame
     lda YARS_ANIMATION_BASE,y                   ; Load .A with the current animation frame  
     sta YARS_SPRITE_POINTER                     ; Tell VICII chip to load the current animation frame
     iny                                         ; Move to the next higher animation frame reference
     sty YARS_CURRENT_FRAME
     cpy YARS_MAX_FRAME_OFFSET                   ; Compare the current animation frame to the max animation frame (last frame)
-    bcc finish_sprite                           ; If we not have reached the end of the animation then finish
+    bcc animate_swirl                           ; If we not have reached the end of the animation then move to next animation
     ldy #0                                      ; else reset the animation frame to the start
     sty YARS_CURRENT_FRAME
+animate_swirl:
+    ;--------------
+    ; Animate Swirl
+    ;--------------
+    lda SWIRL_LIVE                              ; Load the SWIRL Live flag to .A
+    beq ShowQotile                              ; if not set then go to move sprites
+    ldy SWIRL_CURRENT_FRAME                     ; Get SWIRL's current frame
+    lda SWIRL_ANIMATION_BASE,y                  ; Load .A with the current animation frame
+    sta QOTILE_SPRITE_POINTER                   ; Ensure Qotile becomes the SWIRL
+    iny                                         ; Move to the next higher animation frame reference
+    sty SWIRL_CURRENT_FRAME
+    cpy SWIRL_MAX_FRAME_OFFSET                  ; Compare the current SWIRL animation frame to the max animation frame (last frame)
+    bcc move_sprites                            ; If we have not reached the end of the animation move on
+    ldy #0                                      ; else reset the animation frame to the start
+    sty SWIRL_CURRENT_FRAME                     
+    jmp move_sprites
+ShowQotile:
+    lda #$cd                                    ; Load Qotiles sprite memory offset
+    sta QOTILE_SPRITE_POINTER                   ; Store the sprite memory offset for Qotile
 move_sprites:
     ;Set Yar's position on the screen
     jsr process_sprite_horizontal_movemement    ; Put YAR into the correct x position on the screen
     lda YARS_Y_COORDINATE                       ; Put Yar into the correct y position on the screen
     sta SPRITE_0_Y_COOR
-    ;Calculate YARS Screen Character Position
-    jsr Calculate_YARS_Character_Position       ; Calculate where on the screen YAR is (text x,y value)
-:finish_sprite
+finish_sprite:
     jmp Do_User_Commands
 
+
+    ;****************************************************
+    ; Detect if SWIRL kills Yar
+    ; Check if SWIRL impacts with YAR, and if so kill YAR
+    ; and end the game
+    ;****************************************************
+DetectSwirlKillYar:
+    lda SWIRL_CHASE                             ; Load the SWIRL Chase flag
+    beq no_kill_chance                          ; If the SWIRL Chase flag is zero then swirl isn't chasing and cant kill
+    lda SPRITE_SPRITE_COLLISIONS                ; Load the VICII register for sprite to sprite collisions
+    and #%00000011                              ; Isolate YAR and SWIRL impact codes (bullet and missle don't impact here)
+    cmp #$03                                    ; Check the value >= 3 (should never be higher) then we have an impact
+    bcc no_kill_chance                          ; If less than 3 then return
+    lda #$01                                    ; Load flag for game over and loss
+    sta GAMEOVERFLAG
+    sta GAMEMESSAGEINDICATOR
+no_kill_chance:
+    rts                                         ; Return
+
+
+    ;***********************
+    ;Move the SWIRL
+    ;***********************
+check_SWIRL_movement:
+    ; Check should we be moving the swirl
+    lda SWIRL_CHASE                             ; Load the SWIRL chase flag
+    beq finish_SWIRL_movement                   ; If flag not set return out of this routine
+    ; Calculate new position of the SWIRL
+    lda YARS_Y_COORDINATE                       ; Load the YAR's Y coordinate
+    cmp SWIRL_Y_COORDINATE                      ; Compare to the Y of SWIRL
+    bcc yar_above_swirl                         ; Jump if YAR is above the SWIRL
+yar_below_swirl:
+    ldy SWIRL_Y_COORDINATE                      ; Load .Y with the SWIRL Y coordinate
+    iny                                         ; Increment Y to move down on the screen
+    cpy #$e7                                    ; Compare to $E7 (Are we at bottom of screen?)
+    bcc update_swirl_x                          ; Not at bottom of screen keep moving
+    ldy #$e7                                    ; Set SWIRL Y-Corrdinate to bottom of screen
+    jmp update_swirl_x
+yar_above_swirl:
+    ldy SWIRL_Y_COORDINATE                      ; Load .Y with SWIRL Y Coordinate
+    dey                                         ; Decrement T to move up on the screen
+    cpy #$30                                    ; Compare to $30 (Are we at top of screen)
+    bcs update_swirl_x                          ; Not at top of screen keep moving
+    ldy #$30                                    ; Set SWIRL to top of screen
+update_swirl_x:
+    sty SWIRL_Y_COORDINATE                      ; Store the new y coordinate
+    ldx SWIRL_X_COORDINATE                      ; Load the x coordinate
+    dex                                         ; decrememnt the x register by one
+    dex                                         ; decrememnt the x register by one
+    stx SWIRL_X_COORDINATE
+    cpx #$06                                    ; Are we too far to the left
+    bcc turn_off_swirl                          ; If we hit the left side return to Qotile
+    jsr process_swirl_horizontal_movement       ; Set SWIRL Location
+    lda SWIRL_Y_COORDINATE                      ; Set SWIRL Y location
+    sta SPRITE_1_Y_COOR
+    jsr DetectSwirlKillYar
+    jmp finish_SWIRL_movement
+turn_off_swirl:                                 ; Turn off the SWIRL and retrun to Qotile
+    lda #$00                                    ; Load zero value for flags
+    sta SWIRL_CHASE                             ; Set SWIRL Chase to false
+    sta SWIRL_LIVE                              ; Set SWIRL Live to false
+    sta DISABLE_FIRE_BUTTON                     ; Turn on Fire Button
+    lda #$CD                                    ; Set the sprite pointer back to Qotile
+    sta QOTILE_SPRITE_POINTER
+    lda QOTILE_Y_COORDINATE                     ; load quotile's Y coord back into defaults
+    sta SPRITE_1_Y_COOR
+    sta SWIRL_Y_COORDINATE
+    lda DEFAULT_SWIRL_LOCATION
+    sta SWIRL_X_COORDINATE
+    sta QOTILE_X_COORDINATE                     ; Load Quotiles x Coordinate
+    sta SPRITE_1_X_COOR
+    jsr process_swirl_horizontal_movement
+finish_SWIRL_movement:
+    rts
+
+    ;----------------
+    ;Move the bullet
+    ;----------------
+check_bullet_movement:
+    lda BULLET_LIVE                             ; Load the "Is the bullet live" flag
+    beq move_bullet_with_yar                    ; if the flag is false (0) then handle default movement
+    jsr process_bullet_horizontal_movement      ; Process the horizontal movement 
+    lda BULLET_X_COORDINATE                     ; Get the current x position of the bullet
+    cmp SPRITE_MAX_X_COORDINATE                 ; compare the bullet x position to the max x position on the screen
+    bcc move_bullet                             ; if not at max screen location then continue
+    lda #$00                                    ; Load .A with FALSE flag
+    sta BULLET_LIVE                             ; Turn Yars bullet live flag off
+    lda #$03                                    ; Set the default bullet x-coordinate
+    sta BULLET_X_COORDINATE                     ; store the default x-coordinate
+    jsr process_bullet_horizontal_movement      ; Move the bullet back to the default start position
+    jmp bullet_movement_done                    ; complete the bullet move routine
+move_bullet:
+    lda BULLET_X_COORDINATE                     ; Load x-coor
+    clc                                         ; Clear Carry Flag before Add with Cary
+    adc #BULLET_MOVEMENT_SPEED                  ; Add the speed of movement to the x-coor
+    sta BULLET_X_COORDINATE                     ; store the new x-coor
+    jsr Quick_Check_Bullet_Collision
+    jmp bullet_movement_done                    ; complete the bullet move routine
+move_bullet_with_yar:
+    lda YARS_Y_COORDINATE                       ; load Yars y-coordinate
+    sta BULLET_Y_COORDINATE                     ; Set the bullet to the same y location
+    sta SPRITE_2_Y_COOR                         ; Set the y position of the bullet on the screen
+bullet_movement_done:
+    rts
 
     ;*****************************************************
     ; Process Updates to the screen and reset the counters
@@ -466,6 +850,56 @@ clear_yars_ninth_bit:
     and #%11111110                              ; Use bit-wise AND to unset the bit for sprite 0
     jmp complete_horizontal_movement
 complete_horizontal_movement:
+    sta SPRITE_X_MSB_LOCATION                   ; Store .A into X-MSB location for 9th bit
+    rts
+
+process_bullet_horizontal_movement:
+    lda BULLET_X_COORDINATE                     ; Load YAR'S Bullet x-coordinate
+    asl                                         ; double the coordinate
+    sta SPRITE_2_X_COOR                         ; store the result in the proper X register
+    bcc clear_bullet_ninth_bit                  ; If carry flag from doubling is clear, don't set 9th bit
+    ;Set Yar's Bullet 9th bit
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00000100                              ; Use bit-wise OR to set the bit for sprite 2
+    jmp complete_horizontal_bullet_movement
+clear_bullet_ninth_bit:
+    lda SPRITE_X_MSB_LOCATION
+    and #%11111011                              ; Use bit-wise AND to unset the bit for sprite 2
+    jmp complete_horizontal_bullet_movement
+complete_horizontal_bullet_movement:
+    sta SPRITE_X_MSB_LOCATION                   ; Store .A into X-MSB location for 9th bit
+    rts
+
+process_swirl_horizontal_movement:
+    lda SWIRL_X_COORDINATE                      ; Load SWIRLS's x-coordinate
+    asl                                         ; Double the coordinate
+    sta SPRITE_1_X_COOR                         ; Store the result in the proper X register
+    bcc clear_swirl_ninth_bit
+    ;Set SWIRL's 9th bit
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00000010                              ; Use bitwise OR to set the bit for sprite 1
+    jmp complete_swirl_horizontal_movement
+clear_swirl_ninth_bit:
+    lda SPRITE_X_MSB_LOCATION
+    and #%11111101                              ; Use bitwise AND to unset the bit for sprite 1
+    jmp complete_swirl_horizontal_movement
+complete_swirl_horizontal_movement:
+    sta SPRITE_X_MSB_LOCATION
+    rts
+
+process_missle_horizontal_movemement:
+    lda MISSLE_X_COORDINATE                     ; Load Missle's x-coordinate
+    asl                                         ; double the coordinate
+    sta SPRITE_3_X_COOR                         ; store the result in the proper X register
+    bcc clear_missle_ninth_bit                  ; If carry flag from doubling is clear, don't set 9th bit
+    ;Set missle's 9th bit
+    lda SPRITE_X_MSB_LOCATION
+    ora #%00001000                              ; Use bit-wise OR to set the bit for sprite 3
+    jmp complete_missle_horizontal_movement
+clear_missle_ninth_bit:
+    lda SPRITE_X_MSB_LOCATION
+    and #%11110111                              ; Use bit-wise AND to unset the bit for sprite 3
+complete_missle_horizontal_movement:
     sta SPRITE_X_MSB_LOCATION                   ; Store .A into X-MSB location for 9th bit
     rts
 
@@ -509,7 +943,9 @@ ResetShieldBump:
 Start_Joystick_Read:
     jsr get_joystick_command                    ; Get user input
     bcs process_user_movement                   ; If fire button not pressed process any movement
-    nop                                         ; PROCESS FIRE BUTTON BEING PUSHED
+    lda DISABLE_FIRE_BUTTON                     ; Load Fire Button disabled flag
+    bne process_user_movement                   ; if not equal to zero then do not press the button click
+    jsr Press_Fire_Button                       ; PROCESS FIRE BUTTON BEING PUSHED
 process_user_movement:
     lda JOYSTICK_X                              ; Load the users joystick x-coordinate request
     beq check_verticle                          ; If the x-coor request = 0 then check y-coor
@@ -550,6 +986,11 @@ do_the_move_down:
     clc                                         ; Clear the carry before add with carry
     adc #YARS_MOVEMENT_SPEED                    ; Add the speed movement to the down direction
     sta YARS_Y_COORDINATE                       ; Store the new Y-coor
+    ldx BULLET_LIVE
+    cpx #$01
+    bcs complete_user_input
+    sta BULLET_Y_COORDINATE
+    sta SPRITE_2_Y_COOR
     jmp complete_user_input                     ; Already at bottom of screen so finish
 process_up:
     lda YARS_Y_COORDINATE                       ; Load YAR's y-coordinate
@@ -562,10 +1003,35 @@ do_the_move_up:
     sec                                         ; Set the carry flag before subtraction with carry
     sbc #YARS_MOVEMENT_SPEED                    ; Move YAR up by denoted speed
     sta YARS_Y_COORDINATE                       ; Store new y-coord
+    ldx BULLET_LIVE
+    cpx #$01
+    bcs complete_user_input
+    sta BULLET_Y_COORDINATE
+    sta SPRITE_2_Y_COOR
 complete_user_input:
     jsr DetectYarBackgroundHit
     rts                                         ; Return to calling procedure
 
+Press_Fire_Button:
+    lda BULLET_LIVE                             ; Load .A with Yar's bullet status
+    bne complete_fire_button                    ; Yar's bullet is already active so we can jump back to the calling process
+    lda #$01                                    ; Load .A with literal number 1 to indicate the bullet is live
+    sta BULLET_LIVE                             ; Store .A value into the BULLET_LIVE status indicator
+    ;Set Bullet x,y tto match Yar's x,y
+    lda SPRITE_0_Y_COOR                         ; Copy Yar's Y coordinate to the bullet
+    sta SPRITE_2_Y_COOR
+    lda #$03                                     ; back of screen
+    sta SPRITE_2_X_COOR
+    lda #$03
+    sta BULLET_X_COORDINATE
+    lda YARS_Y_COORDINATE
+    sta BULLET_Y_COORDINATE
+   ;display the bullet
+    lda $d015                                   ; Load currently enabled sprites
+    ora #%00000100                              ; Calculate OR to turn on Sprite #2 (Bullet)
+    sta $d015                                   ; Tell the VICII chip which sprites to enable
+complete_fire_button:
+    rts                                         ; Return to calling subroutine
 
 ; The following routine for the joystick read was originally 
 ; written by Bill Hindorf and published in the Programmer's
@@ -600,95 +1066,6 @@ djr3:
                                                 ; button state. if c=1 then button not pressed.
                                                 ; if c=0 then pressed.    
 
-
-;===================================================================
-; Random numbers need to be seeded
-;   A simple way to generate a random number on the
-;   Commodore 64 is to generate white noise from the
-;   sound (SID) chip and ensure no sound is output
-;   then just read the current value of of the noise signal
-;===================================================================
-Setup_Random_Number:
-    ;Initialize the SID (sound) chip to generate a noise pattern for Random numbers
-    ; Random numbers can be found by looking in $d41b
-    lda #$ff                            ; Set the maximum frequency value
-    sta $d40e                           ; Set voice 3 frequency low byte
-    sta $d40f                           ; Set voice 3 frequency high byte
-    lda #$80                            ; Noise waveform, gate bit off (don't play sound)
-    sta $d412                           ; set the voice 3 control register
-    rts
-
-;===================================================================
-; Define Interupt for screen writing
-;   In NA the old TV signal as NTSC which runs on a 60 Hz signal
-;   This means that old televisions updated the screen 60 times
-;   per second.  Since I want graphics to be smooth, I can't
-;   update the screen while it is in the middle of being drawn
-;   or else I'll see partial updates.  To fix this I wait
-;   till the screen draw gets to the bottom of the updateable 
-;   screen (just above the bottom border) before I update the
-;   screen memory
-;===================================================================
-interupts:
-    sei             ; disable the maskable IRQs
-    lda #$7f                
-    sta $dc0d       ; disable timer interrupts which can be generated by the two CIA chips    
-    sta $dd0d       ; the kernel uses such an interrupt to flash the cursor, scan keyboard, etc
-    lda $dc0d       ; by reading these registers we negate any pending CIA irqs
-    lda $dd0d       ; if we don't do this, a pending CIA irq might occur after we finish 
-                    ; setting up this code, and we don't want that
-    lda #$01        ; This is how we tell VICII graphics chip to generate raster interrupt
-    sta $d01a
-    lda #$7f        ; We want to break about half way down (race the beam) to gove extra cycles to draw
-    sta $d012 
-    lda #$1b        ; as there are more than 256 rasterlines, the topmost bit of $d011 serves
-    sta $d011       ; as the 9th bit for the rasterline we want our IRQ to be triggered
-    lda #$35        ; we turn off the BASIC and KERNAL rom here
-    sta $01         ; the cpu now sees RAM everywhere except $d000-$e000
-                    ; where the register;SID;VICII/etc are still visible
-    lda #<irq       ; Setup the address of my interrupt code
-    sta $fffe
-    lda #>irq
-    sta $ffff
-    cli             ; Enable maskable interrupts again
-    rts
-    ;jmp *           ; I don't RTS here as ROMS are switched off, there is no way back to the system
-
-    ;==================================================
-    ; irq 
-    ;    Interupt code to execute
-    ;==================================================
-irq:
-    ; Being that all kernal irq handles switched off we have to handle a few more 
-    ; functions by ourselves.  The registers are not saved and when control is handed
-    ; back the executing code will expect the registers to contain what they did when 
-    ; control was flipped to the interrupt.  We must save and restore these values
-    pha             ; Store register .A into the stack
-    txa             ; Transfer .X into .A
-    pha             ; Store register .A into the stack
-    tya             ; Transfer .Y into .A
-    pha             ; Store register .A into the stack
-    lda #$ff        ; Clean way of clearing the interrupt condition of the VICII
-    sta $d019       ; Inform the VICII that we acknowledged the interrupt, to prevent being reraised
-    ldy SCREEN_INTERUPT_COUNTER     ; Load the Screen Aninmation Counter
-    iny                             ; Increase the Screen Animation Counter
-    sty SCREEN_INTERUPT_COUNTER     ; Store the Screen Animation Counter
-    ldy SPRITE_INTERUPT_COUNTER     ; Load the Sprite animation counter
-    iny                             ; Increase the sprite animation counter
-    sty SPRITE_INTERUPT_COUNTER     ; Store the sprite animation counter
-    ldy USER_INPUT_COUNTER          ; Load the User Input counter
-    iny                             ; Increase the User Input counter
-    sty USER_INPUT_COUNTER          ; Store the user Input counter
-    jsr ProcessIRQ
-    ;clear sprite to background collision flag to clear erronous hits
-    ;register holds value till it is read
-    lda SPRITE_BACKGROUND_COLLISIONS
-    pla             ; Restore Y register from stack (Remeber stack is LIFO: Last In First Out)
-    tay             ; Transfer .A to .Y
-    pla             ; Restore X register from stack
-    tax             ; Transfer .A to .X
-    pla             ; Restore .A from the stack
-    rti             ; Return from interrupt
 
 ;===================================================================
 ; Neutral Zone code
@@ -770,8 +1147,97 @@ char4:
     ldx #232                                    ; display PETSCII code 232 (decimal)
     rts                                         ; return from this subroutine
 
+   ;******************************************************************************
+    ; This code processes the movement of Qotile's Shield.  It does this by
+    ; referencing a direction value (SHIELD_DIRECTION), which indicates if
+    ; the shield should be moving up or down.  Once the direction is determined
+    ; the code increases (down) or decrements (up) the screen text line to start
+    ; drawing the shield at.  If a limit of movement is hit, the code will reverse
+    ; the direction of the shield
+    ;******************************************************************************
+process_movement:
+    ;Shield movement
+    ldx SHIELD_DIRECTION                        ; Load the direction the shield should be moving
+    cpx #1                                      ; Check if up or down
+    bne moveup                                  ; If moving up jump to that section of code else continue
+movedown:
+    ldy SHIELD_DISPLAY_LINE_START               ; Load the screen line number that the shield begins to be displayed
+    cpy #MAX_SHIELD_LINE                        ; Compare the current shield start line number to the max shield start line number
+    bne movedown1                               ; if not equal jump to code to move the shield down on the screen
+    ldx #0                                      ; else lets change the direction of the shield
+    stx SHIELD_DIRECTION                        
+    rts 
+movedown1:
+    iny                                         ; increase the shield start postion on the screen
+    sty SHIELD_DISPLAY_LINE_START               ; Store the new start position in memory
+    rts  
+moveup:
+    ldy SHIELD_DISPLAY_LINE_START               ; Load the screen line number that the shield begins to be displayed
+    cpy #MIN_SHIELD_LINE                        ; Compare the current shield start line number to the min shield start line number
+    bne moveup1                                 ; if not equal jump to code to move the shield up on the screen
+    ldx #1                                      ; else lets change the direction of the shield
+    stx SHIELD_DIRECTION
+    rts
+moveup1:
+    dey                                         ; decrease the shield start postion on the screen
+    sty SHIELD_DISPLAY_LINE_START               ; Store the new start position in memory
+    rts
+
+
+    ;*******************************************************************************************
+    ; Find the position on the text screen where Yar hit the shield
+    ;*******************************************************************************************
+Calculate_YAR_SHIELD_HIT_Position:
+    jsr find_YAR_Y_screenline
+    jsr find_YAR_X_screenline
+    rts
+    
+    ;*******************************************************************************************
+    ; Calculate screen line Yar's bullet is occupying
+    ; Yar is mapped using a 320x200 pixel screen, however the text screen is 40x25.
+    ; Each character on the text screen is 8x8 pixels.  In order to determine where
+    ; on the screen that Yar impacted the shield some quick math needs to be done.
+    ; These calculations are best approximations, as there are two issues
+    ; Issues:
+    ;   1) The collision point is a single pixel within the Yar Sprite, and sprites can
+    ;      straddle between two different text lines
+    ;   2) To make the calculation easy to execute, it is done by shifting bits
+    ;      and integer math, which can introduce potential calculation errors
+    ; Future Corrections:
+    ;   It would be better to eliminate the use of the sprite and background collision register
+    ; and detect collisions using a bounding box or similiar function, but that was out of scope
+    ; for this project.
+    ; Calculations:
+    ;    SCREEN_LINE_Y = INT((yar_y_position-50)/8)+2
+    ;    SCREEN_LINE_X = INT((yar_x_position-24)/8)+2
+    ;*******************************************************************************************
+find_YAR_Y_screenline:
+    lda YARS_Y_COORDINATE             ; Load the y-coord value of YAR's shield hit
+    sec                                         ; Set carry flag for subtraction
+    sbc #50                                     ; Subtract #50
+    lsr                                         ; Divide by 2, 3 times by shifting 
+    lsr                                         ; bits to get value/2^3
+    lsr 
+    clc                                         ; Clear Carry Flag before Add with Cary
+    adc #2                                      ; Add 2 to the equation to offset for sprite looks
+    sta YAR_SHIELD_HIT_Y_COORDINATE             ; Store the Y coordinate location
+    rts 
+
+find_YAR_X_screenline:
+    lda YARS_X_COORDINATE             ; Load the x-coord value of YAR's shield hit
+    sec                                         ; Set carry flag for subtraction
+    sbc #24                                     ; Subtract #24
+    lsr                                         ; Divide by 2, 3 times by shifting 
+    lsr                                         ; bits to get value/2^3
+    lsr 
+    clc                                         ; Clear Carry Flag before Add with Cary
+    adc #2                                      ; Add 2 to the equation to offset for sprite looks
+    sta YAR_SHIELD_HIT_X_COORDINATE             ; Store the X coordinate location
+    rts 
+
 ;===================================================================
 ; Qotile's Shield code
+; The code below actually draws the shield on the screen
 ;===================================================================
     ;==================================================
     ; Draw the Shield 
@@ -782,12 +1248,13 @@ Draw_The_Shield:
     jsr render_shield                           ; Display the shield
     rts 
 
-    ;==================================================
+    ;===========================================================================
     ; NOTE: 
-    ; The rest of Qotile's shield code should not be 
-    ; called directly, this code is used to put
-    ; the shield on the screen
-    ;==================================================
+    ; The rest of Qotile's shield code should not be called directly.  This code
+    ; should only be executed via the Draw_The_Shield label above.
+    ; The reason is there are several nested loops below and the code will
+    ; produce unexpected results if not called correctly
+    ;===========================================================================
 
     ;==================================================
     ; Reset_Shield 
@@ -886,7 +1353,7 @@ blank_shield_poke:
 screen_locate:
     sta ZP                                      ; store the low byte
     stx ZP+1                                    ; store the high byte
-    ; add in offset for color memeory
+    ; add in offset for color memory
     clc                                         ; Clear the carry flag before the addition
     adc #<COLOR_RAM_BASE                        ; Add the low byte of the color RAM location
     sta ZP+2                                    ; Store the low byte in ZeroPage memory
@@ -968,213 +1435,10 @@ render_complete:
 
 
 
-
-
 ;=============================================================
 ; Data for the game
 ;   Contains graphics, variable memory, and screen information
-;   Data is loaded into memory starting at 28672 ($7000)
+;   Data is loaded into memory starting at $3000
 ;=============================================================
-*=$3000
+!source "binarydata.asm"
 
-; Shield graphic at $3000
-!byte $20, $20, $20, $20, $E9, $A0, $69     ; Line 1  (Start $3000 End $3006)
-!byte $20, $20, $E9, $A0, $A0, $69, $20     ; Line 2  (Start $3007 End $300D)
-!byte $20, $E9, $A0, $A0, $69, $20, $20     ; Line 3  (Start $300E End $3014)
-!byte $20, $A0, $A0, $69, $20, $20, $20     ; Line 4  (Start $3015 End $301B)
-!byte $E9, $A0, $69, $20, $20, $20, $20     ; Line 5  (Start $301C End $3022)
-!byte $A0, $A0, $20, $20, $20, $20, $20     ; Line 6  (Start $3023 End $3029)
-!byte $5F, $A0, $DF, $20, $20, $20, $20     ; Line 7  (Start $302A End $3030)
-!byte $20, $A0, $A0, $DF, $20, $20, $20     ; Line 8  (Start $3031 End $3037)
-!byte $20, $5F, $A0, $A0, $DF, $20, $20     ; Line 9  (Start $3038 End $303E)
-!byte $20, $20, $5F, $A0, $A0, $DF, $20     ; Line 10 (Start $303F End $3045)
-!byte $20, $20, $20, $20, $5F, $A0, $DF     ; Line 11 (Start $3046 End $304C)
-
-; Shield/Screen Variables10
-!byte $10 ; SHIELD_SCREEN_POSITION_LOW_BYTE [Memory Location = $304D]
-!byte $00 ; SHIELD_SCREEN_POSITION_HIGH_BYTE [Memory Location = $304E]
-!byte $00 ; CURRENT_SCREEN_LINE [Memory Location = $304F]
-!byte $00 ; TEMP_OFFSET [Memory Location = $3050]
-!byte $05 ; SHIELD_DISPLAY_LINE_START [Memory Location = $3051]
-!byte $00 ; DRAW_SHIELD [Memory Location = $3052]
-!byte $00 ; DRAW_SHIELD_LINE [Memory Location = $3053]
-!byte $00 ; TEMP_STORAGE [Memory Location = $3054]
-
-; Color for Shield
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 1  (Start $3055 End $305B)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 2  (Start $305C End $3062)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 3  (Start $3063 End $3069)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 4  (Start $306A End $3070)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 5  (Start $3071 End $3077)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 6  (Start $3078 End $307E)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 7  (Start $307F End $3085)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 8  (Start $3086 End $308C)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 9  (Start $308D End $3093)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 10 (Start $3094 End $309A)
-!byte $03, $03, $03, $03, $03, $03, $03     ; Line 11 (Start $309b End $30A1)
-
-; Screen Base addresses for potential shield locations low_byte, high_byte pairs
-!byte $21, $04  ; Screen Address ($0421 = Line 1, Column 34 [Memory: $30A2, $30A3])
-!byte $49, $04  ; Screen Address ($0449 = Line 2, Column 34 [Memory: $30A4, $30A5])
-!byte $71, $04  ; Screen Address ($0471 = Line 3, Column 34 [Memory: $30A6, $30A7])
-!byte $99, $04  ; Screen Address ($0499 = Line 4, Column 34 [Memory: $30A8, $30A9])
-!byte $C1, $04  ; Screen Address ($04C1 = Line 5, Column 34 [Memory: $30AA, $30AB])
-!byte $E9, $04  ; Screen Address ($04E9 = Line 6, Column 34 [Memory: $30AC, $30AD])
-!byte $11, $05  ; Screen Address ($0511 = Line 7, Column 34 [Memory: $30AE, $30AF])
-!byte $39, $05  ; Screen Address ($0539 = Line 8, Column 34 [Memory: $30B0, $30B1])
-!byte $61, $05  ; Screen Address ($0511 = Line 9, Column 34 [Memory: $30B2, $30B3])
-!byte $89, $05  ; Screen Address ($0511 = Line 10, Column 34 [Memory: $30B4, $30B5])
-!byte $B1, $05  ; Screen Address ($0511 = Line 11, Column 34 [Memory: $30B6, $30B7])
-!byte $D9, $05  ; Screen Address ($0511 = Line 12, Column 34 [Memory: $30B8, $30B9])
-!byte $01, $06  ; Screen Address ($0511 = Line 13, Column 34 [Memory: $30BA, $30BB])
-!byte $29, $06  ; Screen Address ($0511 = Line 14, Column 34 [Memory: $30BC, $30BD])
-!byte $51, $06  ; Screen Address ($0511 = Line 15, Column 34 [Memory: $30BE, $30BF])
-!byte $79, $06  ; Screen Address ($0511 = Line 16, Column 34 [Memory: $30C0, $30C1])
-!byte $A1, $06  ; Screen Address ($0511 = Line 17, Column 34 [Memory: $30C2, $30C3])
-!byte $C9, $06  ; Screen Address ($0511 = Line 18, Column 34 [Memory: $30C4, $30C5])
-!byte $F1, $06  ; Screen Address ($0511 = Line 19, Column 34 [Memory: $30C6, $30C7])
-!byte $19, $07  ; Screen Address ($0511 = Line 20, Column 34 [Memory: $30C8, $30C9])
-!byte $41, $07  ; Screen Address ($0511 = Line 21, Column 34 [Memory: $30CA, $30CB])
-!byte $69, $07  ; Screen Address ($0511 = Line 22, Column 34 [Memory: $30CC, $30CD])
-!byte $91, $07  ; Screen Address ($0511 = Line 23, Column 34 [Memory: $30CE, $30CF])
-!byte $B9, $07  ; Screen Address ($0511 = Line 24, Column 34 [Memory: $30D0, $30D1])
-!byte $E1, $07  ; Screen Address ($0511 = Line 25, Column 34 [Memory: $30D2, $30D3])
-!byte $9f ; Sprite Max horizontal movement [Memory: $30D4]
-!byte $01 ; Shield Direction of movement [Memory: $30D5]
-
-; Neutral Zone Screen Locations at $30D6
-!byte $14, $04  ; Screen Address ($0414 = Line 1, Column 34 [Memory: $30D6, $30D7])
-!byte $3c, $04  ; Screen Address ($043c = Line 2, Column 34 [Memory: $30D8, $30D9])
-!byte $64, $04  ; Screen Address ($0464 = Line 3, Column 34 [Memory: $30DA, $30DB])
-!byte $8c, $04  ; Screen Address ($048c = Line 4, Column 34 [Memory: $30DC, $30DD])
-!byte $b4, $04  ; Screen Address ($04b4 = Line 5, Column 34 [Memory: $30DE, $30DF])
-!byte $dc, $04  ; Screen Address ($04dc = Line 6, Column 34 [Memory: $30E0, $30E1])
-!byte $04, $05  ; Screen Address ($0504 = Line 7, Column 34 [Memory: $30E2, $30E3])
-!byte $2c, $05  ; Screen Address ($052c = Line 8, Column 34 [Memory: $30E4, $30E5])
-!byte $54, $05  ; Screen Address ($0554 = Line 9, Column 34 [Memory: $30E6, $30E7])
-!byte $7c, $05  ; Screen Address ($057c = Line 10, Column 34 [Memory: $30E8, $30E9])
-!byte $a4, $05  ; Screen Address ($05a4 = Line 11, Column 34 [Memory: $30EA, $30EB])
-!byte $cc, $05  ; Screen Address ($05cc = Line 12, Column 34 [Memory: $30EC, $30ED])
-!byte $f4, $05  ; Screen Address ($05f4 = Line 13, Column 34 [Memory: $30EE, $30EF])
-!byte $1c, $06  ; Screen Address ($061c = Line 14, Column 34 [Memory: $30F0, $30F1])
-!byte $44, $06  ; Screen Address ($0644 = Line 15, Column 34 [Memory: $30F2, $30F3])
-!byte $6c, $06  ; Screen Address ($066c = Line 16, Column 34 [Memory: $30F4, $30F5])
-!byte $94, $06  ; Screen Address ($0694 = Line 17, Column 34 [Memory: $30F6, $30F7])
-!byte $bc, $06  ; Screen Address ($06bc = Line 18, Column 34 [Memory: $30F8, $30F9])
-!byte $e4, $06  ; Screen Address ($06e4 = Line 19, Column 34 [Memory: $30FA, $30FB])
-!byte $0c, $07  ; Screen Address ($070c = Line 20, Column 34 [Memory: $30FC, $30FD])
-!byte $34, $07  ; Screen Address ($0734 = Line 21, Column 34 [Memory: $30FE, $30FF])
-!byte $5c, $07  ; Screen Address ($075c = Line 22, Column 34 [Memory: $3100, $3101])
-!byte $84, $07  ; Screen Address ($0784 = Line 23, Column 34 [Memory: $3102, $3103])
-!byte $ac, $07  ; Screen Address ($07ac = Line 24, Column 34 [Memory: $3104, $3105])
-!byte $d4, $07  ; Screen Address ($07d4 = Line 25, Column 34 [Memory: $3106, $3107])
-
-; CREATE VARIABLES FOR THESE
-; ReWRITE DELAY LOOP TO TRIGGER EVENTS OFF SCREEN INTERUPT (1/60 sec)
-; Put YAR on screen
-; Read Joystick
-!byte $c5, $c6, $c7, $c8, $c9, $ca  ; Yar's animation frames [Memory: $3108-$310D]
-!byte $00                           ; Yar's current animation frame [Memory: $310E]
-!byte $06                           ; Yar's max animation frame [Memory: $310F]
-!byte $00                           ; Screen animation interupt counter [Memory: $3110]
-!byte $09                           ; Screen Interupt action trigger [Memory: $3111]
-!byte $00                           ; Sprite animation interupt counter [Memory: $3112]
-!byte $03                           ; Sprite animation Interupt action trigger [Memory: $3113]
-!byte $00                           ; Screen Update Occurred [Memory: $3114]
-!byte $3f, $89                      ; Yar's x & y coordinates [Memory: $3115, $3116]
-!byte $00, $00, $00                 ; Players joystick commands [Memory: $3117, $3118, $3119]
-!byte $00                           ; User Input interupt counter [Memory: $311A]
-!byte $02                           ; User input interupt action trigger [Memory: $311B]
-!byte $00                           ; YARS screen y-coordinate (PETSCII) [Memory: $311C]
-!byte $00                           ; YARS screen x-coordinate (PETSCII) [Memory: $311D]
-!byte $1e, $81                      ; Qotile's x & y coordinates [Memory: $311E, $311F]
-!byte $00                           ; Shield Bump variable [Memory: $3120]
-!byte $0f                           ; Bump Distance [Memory: $3121]
-
-*=$3140
-; SPRITE IMAGE DATA : 14 images : total size is 896 ($380) bytes.
-; ===========================================
-; Sprite's for Yar's animation
-; ===========================================
-; Yar - Image #1 - Offset: $c5
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $30,$00,$00,$0c,$00,$00,$c3,$02,$00,$c0,$c4,$00,$ff,$38,$00,$ff
-!byte $38,$00,$ff,$38,$00,$ff,$38,$00,$c0,$c4,$00,$c3,$02,$00,$0c,$00
-!byte $00,$30,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #2 - Offset: $c6
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00
-!byte $18,$00,$00,$86,$00,$00,$c1,$02,$00,$c0,$c4,$00,$ff,$38,$00,$7f
-!byte $38,$00,$7f,$38,$00,$ff,$38,$00,$c0,$c4,$00,$c1,$02,$00,$86,$00
-!byte $00,$18,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #3 - Offset: $c7
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00,$18,$00,$00
-!byte $44,$00,$00,$43,$00,$00,$60,$82,$00,$60,$c4,$00,$7f,$38,$00,$3f
-!byte $38,$00,$3f,$38,$00,$7f,$38,$00,$60,$c4,$00,$60,$82,$00,$43,$00
-!byte $00,$46,$00,$00,$18,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #4 - Offset: $c8
-!byte $00,$00,$00,$00,$00,$00,$00,$08,$00,$00,$04,$00,$00,$02,$00,$01
-!byte $c1,$00,$00,$61,$00,$00,$20,$82,$00,$20,$c4,$00,$3f,$38,$00,$1f
-!byte $38,$00,$1f,$38,$00,$3f,$38,$00,$20,$c4,$00,$20,$82,$00,$61,$00
-!byte $01,$c3,$00,$00,$02,$00,$00,$04,$00,$00,$08,$00,$00,$00,$00,$01
-; Yar - Image #5 - Offset: $c9
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00,$18,$00,$00
-!byte $44,$00,$00,$43,$00,$00,$60,$82,$00,$60,$c4,$00,$7f,$38,$00,$3f
-!byte $38,$00,$3f,$38,$00,$7f,$38,$00,$60,$c4,$00,$60,$82,$00,$43,$00
-!byte $00,$46,$00,$00,$18,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$01
-; Yar - Image #6 - Offset: $ca
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$00,$00
-!byte $18,$00,$00,$86,$00,$00,$c1,$02,$00,$c0,$c4,$00,$ff,$38,$00,$7f
-!byte $38,$00,$7f,$38,$00,$ff,$38,$00,$c0,$c4,$00,$c1,$02,$00,$86,$00
-!byte $00,$18,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; ===========================================
-; Sprite for Yar's bullet
-; ===========================================
-; Yar - Bullet - Offset: $cb
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $07,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; ===========================================
-; Sprite for Qotile's missle
-; ===========================================
-; Qotile - Guided Missle - Offset: $cc
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$fe,$00,$00,$fe,$00
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$06
-; ===========================================
-; Sprite for Qotile 
-; ===========================================
-; Qotile - Offset: $cd
-!byte $00,$00,$0c,$00,$00,$1c,$00,$00,$3c,$00,$00,$6c,$00,$00,$cc,$00
-!byte $01,$8c,$00,$03,$0c,$00,$06,$0c,$00,$1c,$0c,$00,$70,$0c,$00,$7f
-!byte $fc,$00,$70,$0c,$00,$1c,$0c,$00,$06,$0c,$00,$03,$0c,$00,$01,$8c
-!byte $00,$00,$cc,$00,$00,$6c,$00,$00,$3c,$00,$00,$1c,$00,$00,$0c,$09
-; ===========================================
-; Sprite's for Qotile's Swirl animation
-; ===========================================
-; Qotile Swirl - Image #1 - Offset: $ce
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$10,$00,$00
-!byte $20,$00,$00,$40,$00,$00,$40,$00,$00,$43,$80,$00,$3c,$40,$00,$3c
-!byte $20,$04,$3c,$00,$02,$3c,$00,$01,$c2,$00,$00,$02,$00,$00,$02,$00
-!byte $00,$04,$00,$00,$08,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #2  - Offset: $cf
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$08,$00,$00
-!byte $10,$00,$00,$20,$00,$00,$20,$00,$00,$20,$00,$00,$3f,$80,$04,$3c
-!byte $40,$02,$3c,$20,$01,$fc,$00,$00,$04,$00,$00,$04,$00,$00,$04,$00
-!byte $00,$08,$00,$00,$10,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #3 - Offset: $d0
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$04,$00,$00
-!byte $08,$00,$00,$10,$00,$00,$10,$00,$00,$10,$00,$04,$18,$00,$02,$3f
-!byte $80,$01,$fc,$40,$00,$18,$20,$00,$08,$00,$00,$08,$00,$00,$08,$00
-!byte $00,$10,$00,$00,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #4 - Offset: $d1
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$02,$00,$00
-!byte $04,$00,$00,$08,$00,$00,$08,$00,$04,$08,$00,$02,$18,$00,$01,$fc
-!byte $00,$00,$3f,$80,$00,$18,$40,$00,$10,$20,$00,$10,$00,$00,$10,$00
-!byte $00,$20,$00,$00,$40,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
-; Qotile Swirl - Image #4 - Offset: $d2
-!byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-!byte $01,$80,$02,$02,$00,$02,$04,$00,$01,$04,$00,$00,$fc,$00,$00,$3c
-!byte $00,$00,$3c,$00,$00,$3f,$00,$00,$20,$80,$00,$20,$40,$00,$40,$40
-!byte $01,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
