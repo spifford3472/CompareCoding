@@ -1,31 +1,70 @@
 import sys, pygame
 from Shield import Shield
 
+from Yar import Yar
+import time
+
 pygame.init()
 
-size = width, height = 320, 240
+fps = 10 # frames per second
+size = width, height = 300, 200
 speed = [2, 2]
-black = 0, 0, 0
+black = (0, 0, 0)
 
+# Initialize the screen 
 screen = pygame.display.set_mode(size)
+screen.fill(black)
 
+# Initialize the classes
+# Create Qotile's shield class instance
 qotile_shield = Shield()
 qotile_shield.draw_shield()
+clock = pygame.time.Clock()
+yar = Yar()
+yar_animation = pygame.sprite.Group(yar)
 
-#ball = pygame.image.load("images/intro_ball.gif")
-#ballrect = ball.get_rect()
+#Setup the joystick 
+joystick1 = pygame.joystick.get_count()
+if joystick1 == 0:
+    print("No joystick to configure.")
+else:
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
 
-
+# Enter the repeating game loop
 while 1:
     for event in pygame.event.get():
-        if event.type == pygame.QUIT: sys.exit()
-
-    #ballrect = ballrect.move(speed)
-    #if ballrect.left < 0 or ballrect.right > width:
-    #    speed[0] = -speed[0]
-    #if ballrect.top < 0 or ballrect.bottom > height:
-    #    speed[1] = -speed[1]
-
-    screen.fill(black)
-    screen.blit(qotile_shield.get_shield(), (264,0) )
+        if event.type == pygame.QUIT:
+            sys.exit()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_d:
+                yar.move_right()
+            if event.key == pygame.K_a:
+                yar.move_left()
+            if event.key == pygame.K_w:
+                yar.move_up()    
+            if event.key == pygame.K_x:
+                yar.move_down() 
+        if event.type == pygame.JOYBUTTONDOWN:
+            print("Fire...")
+    if joystick != 0:
+        x_movement = joystick.get_axis(0)
+        y_movement = joystick.get_axis(1)
+        if x_movement < -0.01:
+            yar.move_left()
+        if x_movement > 0.01:
+            yar.move_right()
+        if y_movement < -0.01:
+            yar.move_up()
+        if y_movement > 0.01:
+            yar.move_down()
+    screen.fill((0,0,0))
+    qotile_shield.draw_shield()
+    screen.blit(qotile_shield.get_shield(), (264,qotile_shield.get_shield_screen_y()) )
     pygame.display.flip()
+    yar_animation.update()
+    yar_animation.draw(screen)
+    pygame.display.update()
+    clock.tick(fps)
+    
+
