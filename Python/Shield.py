@@ -53,7 +53,7 @@ class Shield:
         self.shield_block_size_x = 8
         self.shield_block_size_y = 8
         self.shield_screen_y_location = 0
-        self.shield_screen_max_y = 144
+        self.shield_screen_max_y = 112
         self.shield_direction = 1
         self.shield_surface = pygame.Surface((56,200))
         self.blue = (0,0,255)
