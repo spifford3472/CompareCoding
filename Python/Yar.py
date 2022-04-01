@@ -53,7 +53,7 @@ class Yar(pygame.sprite.Sprite):
         self.image = self._images[self._index]
         self.screen_x = 120
         self.screen_y = 110
-        self._yar_speed = 3
+        self._yar_speed = 6
         self._yar_x_min = 9
         self._yar_x_max = 274
         self._yar_y_min = 0

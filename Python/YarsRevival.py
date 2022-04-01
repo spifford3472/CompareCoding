@@ -22,6 +22,13 @@ clock = pygame.time.Clock()
 yar = Yar()
 yar_animation = pygame.sprite.Group(yar)
 
+#Setup the joystick 
+joystick1 = pygame.joystick.get_count()
+if joystick1 == 0:
+    print("No joystick to configure.")
+else:
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
 
 # Enter the repeating game loop
 while 1:
@@ -36,7 +43,20 @@ while 1:
             if event.key == pygame.K_w:
                 yar.move_up()    
             if event.key == pygame.K_x:
-                yar.move_down()                                    
+                yar.move_down() 
+        if event.type == pygame.JOYBUTTONDOWN:
+            print("Fire...")
+    if joystick != 0:
+        x_movement = joystick.get_axis(0)
+        y_movement = joystick.get_axis(1)
+        if x_movement < -0.01:
+            yar.move_left()
+        if x_movement > 0.01:
+            yar.move_right()
+        if y_movement < -0.01:
+            yar.move_up()
+        if y_movement > 0.01:
+            yar.move_down()
     screen.fill((0,0,0))
     qotile_shield.draw_shield()
     screen.blit(qotile_shield.get_shield(), (264,qotile_shield.get_shield_screen_y()) )
