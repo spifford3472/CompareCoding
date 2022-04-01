@@ -4,7 +4,7 @@ import enum;
 class Shield:
     """
     A class to represent Qotile's shield
-    ...
+    
     Attributes
     ----------
     shield_layout : [list[list]]
@@ -62,7 +62,7 @@ class Shield:
         """
         Moves the shield, and draws the shield graphic onto the surface object
         """
-        self.__move_shield()
+        self._move_shield()
         for y in range(len(self.shield_layout)):
             for x in range(len(self.shield_layout[0])):
                 point_a = (((x*self.shield_block_size_x)+7),(y*self.shield_block_size_y))
@@ -92,7 +92,7 @@ class Shield:
         """
         return self.shield_screen_y_location
     
-    def __move_shield(self):
+    def _move_shield(self):
         """
         Moves the shield and corrects the direction of movement when screen limits are reached
         """
