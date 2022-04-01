@@ -23,8 +23,7 @@ class Yar(pygame.sprite.Sprite):
         self.yar_x_max = 274
         self.yar_y_min = 0
         self.yar_y_max = 180
-        #self.rect = pygame.Rect(self.screen_x, self.screen_y, 16, 18)
-        #print("yar x:{x} y:{y}",format(str(self.screen_x),str(self.screen_y)))
+
     
     def update(self):
         self.index += 1
@@ -32,7 +31,7 @@ class Yar(pygame.sprite.Sprite):
             self.index = 0
         self.image = self.images[self.index]
         self.rect = pygame.Rect(self.screen_x, self.screen_y, 16, 18)
-        print("yar x:{%2d} y:{%2d}" % (self.screen_x,self.screen_y))
+
 
     def move_right(self):
         if self.screen_x >= self.yar_x_max:
