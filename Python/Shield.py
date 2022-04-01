@@ -1,10 +1,12 @@
 import pygame;
+
 import enum;
+
 
 class Shield:
     """
     A class to represent Qotile's shield
-    
+
     Attributes
     ----------
     shield_layout : [list[list]]
@@ -35,6 +37,7 @@ class Shield:
     get_shield_screen_y():
         Returns an integer of which y coordinate to start drawing the shield at
     """
+
     def __init__(self):
         """
         Contructs all the necessary attributes for Qotile's shield object.
@@ -63,6 +66,7 @@ class Shield:
         Moves the shield, and draws the shield graphic onto the surface object
         """
         self._move_shield()
+
         for y in range(len(self.shield_layout)):
             for x in range(len(self.shield_layout[0])):
                 point_a = (((x*self.shield_block_size_x)+7),(y*self.shield_block_size_y))
@@ -101,6 +105,7 @@ class Shield:
         if self.shield_screen_y_location>=self.shield_screen_max_y:
             self.shield_direction = -1
         self.shield_screen_y_location = self.shield_screen_y_location + (8 * self.shield_direction)
+
 
 
 
