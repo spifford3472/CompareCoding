@@ -36,6 +36,9 @@ class Shield:
 
     get_shield_screen_y():
         Returns an integer of which y coordinate to start drawing the shield at
+    
+    get_shield_center_coordinate():
+        Returns the y coordinate of the center of the shield
     """
 
     def __init__(self):
@@ -106,6 +109,8 @@ class Shield:
             self.shield_direction = -1
         self.shield_screen_y_location = self.shield_screen_y_location + (8 * self.shield_direction)
 
+    def get_shield_center_coordinate(self):
+        return self.get_shield_screen_y()+35
 
 
 

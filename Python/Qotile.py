@@ -5,7 +5,7 @@ class Qotile(pygame.sprite.Sprite):
         """
         Contructs all the necessary attributes for Qotile
         """        
-        super(Yar, self).__init__()
+        super(Qotile, self).__init__()
         self._images=[]
         self._images.append(pygame.image.load('Python/images/Qotile.png'))
         self._images.append(pygame.image.load('Python/images/Swirl1.png'))
@@ -23,6 +23,23 @@ class Qotile(pygame.sprite.Sprite):
         self._qotile_y_max = 180
         self._qotile_width = 16
         self._qotile_height = 18
+        self._swirl_active = False
 
     def qotile_move(self,y):
         self.screen_y=y
+
+    def update(self):
+        """
+        Rotates the current animation image, and places the Qotile or Swirl on the screen.
+        """   
+        if self._swirl_active == True:
+            self._index += 1
+            if self._index >= len(self._images):
+                self._index = 1
+        else:
+            self._index = 0
+        self.image = self._images[self._index]
+        self.rect = pygame.Rect(self.screen_x, self.screen_y, self._qotile_width, self._qotile_height)
+    
+    def set_qotile_y_position(self,y):
+        self.screen_y = y
