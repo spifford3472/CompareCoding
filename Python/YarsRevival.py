@@ -1,12 +1,12 @@
 import sys, pygame
 from Shield import Shield
-
+from Neutral import NeutralZone
 from Yar import Yar
 import time
 
 pygame.init()
 
-fps = 10 # frames per second
+fps = 20 # frames per second
 size = width, height = 300, 200
 speed = [2, 2]
 black = (0, 0, 0)
@@ -22,6 +22,7 @@ qotile_shield.draw_shield()
 clock = pygame.time.Clock()
 yar = Yar()
 yar_animation = pygame.sprite.Group(yar)
+neutralzone = NeutralZone()
 
 #Setup the joystick 
 joystick1 = pygame.joystick.get_count()
@@ -61,6 +62,8 @@ while 1:
     screen.fill((0,0,0))
     qotile_shield.draw_shield()
     screen.blit(qotile_shield.get_shield(), (264,qotile_shield.get_shield_screen_y()) )
+    neutralzone.draw_zone()
+    screen.blit(neutralzone.get_neutral_zone(), (170,0))
     pygame.display.flip()
     yar_animation.update()
     yar_animation.draw(screen)
