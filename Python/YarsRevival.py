@@ -26,6 +26,8 @@ clock = pygame.time.Clock()
 yar = Yar()
 yar_animation = pygame.sprite.Group(yar)
 neutralzone = NeutralZone()
+nz_min,nz_max=neutralzone.get_neutral_zone_x_coordinates()
+yar.set_neutral_zone(nz_min,nz_max)
 qotile = Qotile()
 qotile_animation = pygame.sprite.Group(qotile)
 
@@ -45,7 +47,8 @@ while 1:
             if event.type == pygame.QUIT:
                 sys.exit()
             if event.type == pygame.JOYBUTTONDOWN:
-                print("Fire...")
+                if yar.get_neutral_zone_flag()==False:
+                    print("Fire...")
         if joystick != 0:
             x_movement = joystick.get_axis(0)
             y_movement = joystick.get_axis(1)

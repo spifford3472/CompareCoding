@@ -2,40 +2,14 @@ import pygame
 
 class Yar(pygame.sprite.Sprite):
     """
-    A class to represent the players character Yar
-    
-    Attributes
-    ----------
-    image : pygame.image
-        Denotes the current displayable image for the Yar character
-    screen_x : int
-        Denotes the characters current x position on the screen
-    screen_y : int
-        Denotes the characters current y position on the screen
- 
-    Methods
-    -------
-    update():
-        Creates the next animation frame and places it on the screen
+    Yar Contains the code for the Yar actor
 
-    move_right():
-        Moves the Yar character coordinates to the right
-    
-    move_left():
-        Moves the Yar character coordinates to the left
-
-    move_up():
-        Moves the Yar character coordinates up
-
-    move_down():
-        Moves the Yar character coordinates down
-
-    set_start_position(x,y)
-        Sets the initial screen coordinate for the Yar
+    :param pygame: the Sprite class from pygame.sprite
+    :type pygame: Sprite
     """
     def __init__(self):
         """
-        Contructs all the necessary attributes for the Yar.
+        __init__ Constructs the necessary objects for the Yar character
         """        
         super(Yar, self).__init__()
         self._images=[]
@@ -60,11 +34,14 @@ class Yar(pygame.sprite.Sprite):
         self._yar_y_max = 180
         self._yar_width = 16
         self._yar_height = 18
+        self._neutralzone_min = 0
+        self._neutralzone_max = 1
+        self._inNeutralZone = False
     
     def update(self):
         """
-        Rotates the current animation image, and places the Yar on the screen.
-        """        
+        update Animates the Yar character and places on the screen
+        """      
         self._index += 1
         if self._index >= len(self._images):
             self._index = 0
@@ -73,26 +50,28 @@ class Yar(pygame.sprite.Sprite):
 
     def move_right(self):
         """
-        Moves the Yar's screen x location to the right
-        """        
+        move_right Moves the Yar character to the right
+        """       
         if self.screen_x >= self._yar_x_max:
             self.screen_x = self._yar_x_max
         else:
             self.screen_x += self._yar_speed
+        self._check_neutral_zone()
 
     def move_left(self):
         """
-        Moves the Yar's screen x location to the left
+        move_left Moves the Yar character to the left
         """         
         if self.screen_x <= self._yar_x_min:
             self.screen_x = self._yar_x_min
         else:
             self.screen_x -= self._yar_speed
+        self._check_neutral_zone()
 
     def move_up(self):
         """
-        Moves the Yar's screen y location to the up
-        """         
+        move_up Moves the YAR character up
+        """       
         if self.screen_y <= self._yar_y_min:
             self.screen_y = self._yar_y_min
         else:
@@ -100,8 +79,8 @@ class Yar(pygame.sprite.Sprite):
 
     def move_down(self):
         """
-        Moves the Yar's screen y location down
-        """         
+        move_down Moves the Yar character down
+        """        
         if self.screen_y >= self._yar_y_max:
             self.screen_y = self._yar_y_max
         else:
@@ -109,8 +88,13 @@ class Yar(pygame.sprite.Sprite):
 
     def set_start_position(self,x,y):
         """
-        Function set set the position of Yar on the screen
-        """ 
+        set_start_position Sets the position of the Yar character on the screen
+
+        :param x: _description_
+        :type x: _type_
+        :param y: _description_
+        :type y: _type_
+        """
         if x >= self._yar_x_max or x <= self._yar_x_min:
             self.screen_x = 120
         else:
@@ -120,3 +104,34 @@ class Yar(pygame.sprite.Sprite):
         else:
             self.screen_y = y     
         
+    def _check_neutral_zone(self):
+        """
+        _check_neutral_zone Updates if YAR is in the neutral zone
+        """        
+        if self.screen_x >= self._neutralzone_min and self.screen_x <= self._neutralzone_max:
+            self._inNeutralZone=True
+        else:
+            self._inNeutralZone=False
+
+    def set_neutral_zone(self, min_x:int, max_x:int):
+        """
+        set_neutral_zone Set the neutral zone location
+
+        :param min_x: The start x coordinate of the neutral zone
+        :type min_x: int
+        :param max_x: The end x-coordinate of the neutral zone
+        :type max_x: int
+        """
+        self._neutralzone_min = min_x
+        self._neutralzone_max = max_x
+
+
+    def get_neutral_zone_flag(self):
+        """
+        get_neutral_zone_flag Return boolean flag True if Yar is in the neutral zone
+
+        :return: Boolean flag of Neutral zone status
+        :rtype: boolean
+        """  
+        return self._inNeutralZone 
+           
