@@ -1,5 +1,5 @@
 import pygame;
-from random import seed;
+from random import seed
 from random import randint
 
 class NeutralZone:

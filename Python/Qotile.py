@@ -1,4 +1,6 @@
 import pygame
+from random import seed
+from random import randint
 
 class Qotile(pygame.sprite.Sprite):
     """
@@ -30,7 +32,14 @@ class Qotile(pygame.sprite.Sprite):
         self._qotile_width = 16
         self._qotile_height = 18
         self._swirl_active = False
+        self._swirl_wait_cycles = randint(100, 600)
 
+    def get_next_swirl_apperance(self):
+        """
+        get_next_swirl_apperance Sets the number of pygame clock cycles to wait before transforming to the swirl
+        """    
+        self._swirl_wait_cycles = randint(100, 600)
+    
     def update(self):
         """
         update Rotates the current animation image, and places the correct Qotile or Swirl image on the screen
@@ -41,6 +50,10 @@ class Qotile(pygame.sprite.Sprite):
                 self._index = 1
         else:
             self._index = 0
+            if self._swirl_wait_cycles == 0:
+                self._swirl_active=True
+            else:
+                self._swirl_wait_cycles -= 1
         self.image = self._images[self._index]
         self.rect = pygame.Rect(self.screen_x, self.screen_y, self._qotile_width, self._qotile_height)
     

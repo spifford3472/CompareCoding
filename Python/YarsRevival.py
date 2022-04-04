@@ -87,6 +87,7 @@ while 1:
     yar_animation.update()
     yar_animation.draw(screen)
     pygame.display.update()
+    
     clock.tick(fps)
     
 
