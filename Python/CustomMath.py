@@ -62,4 +62,5 @@ class CustomMath:
                 return validBorder
             sum_ += cmath.log( (complex(*v1) - complex(*P)) / (complex(*v0) - complex(*P)) )
         return abs(sum_) > 1
-    
+
+

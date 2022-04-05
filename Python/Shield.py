@@ -187,7 +187,21 @@ class Shield:
                 break
         return collision_occurred
 
-
+    def check_cannon_collision(self, object_screen_x, object_screen_y):
+        collision_occurred = False
+        # Load 2 points in to account for the height of the cannon 
+        check_points = [(object_screen_x+8, object_screen_y),(object_screen_x+9, object_screen_y+4)]
+        # Loop through the points to check for a collision
+        for point_to_check in check_points:
+            for shield_part in self._shield_parts:
+                if shield_part['remove']==False:
+                    test_collision = shield_part['collision_check']
+                    if test_collision.isInsidePolygon(point_to_check,False)==True:
+                        collision_occurred = True
+                        break   #Stop processing and fall out of the loop
+            if collision_occurred==True:
+                break
+        return collision_occurred
 
 
 

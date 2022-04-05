@@ -28,7 +28,7 @@ class Yar(pygame.sprite.Sprite):
         self.screen_x = 120
         self.screen_y = 110
         self._yar_speed = 6
-        self._yar_x_min = 9
+        self._yar_x_min = 12
         self._yar_x_max = 274
         self._yar_y_min = 0
         self._yar_y_max = 180
@@ -37,6 +37,7 @@ class Yar(pygame.sprite.Sprite):
         self._neutralzone_min = 0
         self._neutralzone_max = 1
         self._inNeutralZone = False
+        self.rect = pygame.Rect(self.screen_x, self.screen_y, self._yar_width, self._yar_height)
     
     def update(self):
         """
