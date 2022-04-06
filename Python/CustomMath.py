@@ -1,4 +1,5 @@
 import cmath
+import math
 
 class CustomMath:
     """Customized polygon math to detect collisions between objects.
@@ -12,8 +13,6 @@ class CustomMath:
         * Cauchy's Theorem
     More Information available at: https://math.mit.edu/~jorloff/18.04/notes/topic3.pdf
 
-    Attributes:
-        No public attributes for use
     """    
 
     def __init__(self,vertices):
