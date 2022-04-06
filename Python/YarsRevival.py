@@ -9,7 +9,6 @@ from GuidedMissle import GuidedMissle       # Custom class used to represent the
 from random import randint                  # Used to create random numbers for colors
 
 
-
 fps = 15                                    # frames per second for the screen
 size = width, height = 300, 200             # Size of the screen
 black = (0, 0, 0)                           # RGB color for black game screen
@@ -17,6 +16,7 @@ green = (0, 255, 0)                         # RGB color for Text font
 blue = (0, 0, 255)                          # RGB color for text background
 bounce_yar=False                            # Signal to bounce Yar away from the shield after nibbling a section
 bounce_yar_start = 0                        # Used to track how far to bounce Yar away from the shield
+
 
 def GameOver(msg:str):
     """
