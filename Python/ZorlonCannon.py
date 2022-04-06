@@ -49,14 +49,14 @@ class ZorlonCannon(pygame.sprite.Sprite):
         move_right Move the cannon to the right if it was fired
         """        
         # Will only move the cannon to the right if the cannon was shot
-        if self._currently_fired==True:
-            if self.screen_x < 270:
-                self.screen_x += self._cannon_speed
-            else:
-                self.screen_x += self._slow_cannon_speed
-                if self.screen_x >= self._x_max:
-                    self.screen_x = self._x_begin
-                    self._currently_fired = False
+        if self._currently_fired!=True: return
+        if self.screen_x < 270:
+            self.screen_x += self._cannon_speed
+        else:
+            self.screen_x += self._slow_cannon_speed
+            if self.screen_x >= self._x_max:
+                self.screen_x = self._x_begin
+                self._currently_fired = False
 
     def fire_cannon(self):
         """
