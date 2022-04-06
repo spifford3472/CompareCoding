@@ -1,4 +1,5 @@
-import pygame;
+import pygame
+import itertools
 from random import seed
 from random import randint
 
@@ -48,9 +49,9 @@ class NeutralZone:
         draw_zone Draws the Neutral zone onto the surface object
         """  
         # Draw rectangles for each row, column in the Neutral Zone and set a random color to it
-        for y in range(self._ysections):
-            for x in range(self._xsections):
-                pygame.draw.rect(self.nz_surface, self._random_color(),(x*8,y*8,7,4))
+        # Used itertools here to eliminate a nested for loop ( for x .... for y... do x,y)
+        for y_coor, x_coor in itertools.product(range(self._ysections), range(self._xsections)):
+            pygame.draw.rect(self.nz_surface, self._random_color(),(x_coor*8,y_coor*8,7,4))
     
     def get_neutral_zone(self):
         """

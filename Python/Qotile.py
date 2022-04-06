@@ -44,32 +44,32 @@ class Qotile(pygame.sprite.Sprite):
         :type yar_x: int
         :param yar_y: Yar's current y-coordinate on the screen
         :type yar_y: int
-        """        
-        if self._swirl_active==True:            # If Swirl is active then process
-            if self._swirl_countdown != 0:      # Check if the Swirl launch count down has reached zero
-                self._swirl_countdown -= 1
-            else:                               # Countdown has reached or is already at zero
-                # Calculate simple trajectory toward Yar by only moving the y-coordinate towards Yar
-                if yar_y < self.screen_y:
-                    self.screen_y -= 3
-                else:
-                    self.screen_y += 3
-                # Probably not needed, but ensures the Swirl stays on the visible screen
-                if self.screen_y < 0:
-                    self.screen_y=0
-                if self.screen_y>200:
-                    self.screen_y=200
-            # The Swirl x-coordinate moves at a set speed
-            self.screen_x -= 10
-            # If Swirl has reached the far end of the screen then reset the Swirl back into Qotile 
-            # and reset Qotile's standard position in the shield
-            if self.screen_x <= 10:
-                self.screen_x = self._qotile_x_max
-                self._swirl_active=False
-                # Set the next launch countdown to a random number of screen updates (between 50 and 200)
-                self._swirl_countdown = randint(50, 200)  
-                # Set the amount of time before the Swirl appears again  
-                self.get_next_swirl_apperance() 
+        """   
+        if self._swirl_active != True: return  # Check if Swirl is active, if not then skip
+        if self._swirl_countdown != 0:      # Check if the Swirl launch count down has reached zero
+            self._swirl_countdown -= 1
+        else:                               # Countdown has reached or is already at zero
+            # Calculate simple trajectory toward Yar by only moving the y-coordinate towards Yar
+            if yar_y < self.screen_y:
+                self.screen_y -= 3
+            else:
+                self.screen_y += 3
+            # Probably not needed, but ensures the Swirl stays on the visible screen
+            if self.screen_y < 0:
+                self.screen_y=0
+            if self.screen_y>200:
+                self.screen_y=200
+        # The Swirl x-coordinate moves at a set speed
+        self.screen_x -= 10
+        # If Swirl has reached the far end of the screen then reset the Swirl back into Qotile 
+        # and reset Qotile's standard position in the shield
+        if self.screen_x <= 10:
+            self.screen_x = self._qotile_x_max
+            self._swirl_active=False
+            # Set the next launch countdown to a random number of screen updates (between 50 and 200)
+            self._swirl_countdown = randint(50, 200)  
+            # Set the amount of time before the Swirl appears again  
+            self.get_next_swirl_apperance() 
 
     def get_next_swirl_apperance(self):
         """
