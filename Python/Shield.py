@@ -2,7 +2,6 @@ import pygame;
 from CustomMath import CustomMath
 import enum;
 
-
 class Shield:
     """
      Qotile's shield class
@@ -14,8 +13,11 @@ class Shield:
         """   
         # Contains the representation of Qotile's shield
         #   0 - blank space
+        #   1 - right triangle with 90 degree angle located in lower right
         #   2 - square block
-        #   <other> - different triangles 
+        #   3 - right triangle with 90 degree angle located in upper left
+        #   4 - right triangle with 90 degree angle located in upper right
+        #   5 - right triangle with 90 degree angle located in the lower right 
         self.shield_layout = [[0,0,0,0,1,2,3],
                              [0,0,1,2,2,3,0],
                              [0,1,2,2,3,0,0],
@@ -39,7 +41,6 @@ class Shield:
         self._shield_part_desc = {}                         # Dictionary item to hold specific objects for each shield block
         self._shield_parts = []                             # A tuple to hold all the shield objects
 
-    
     def draw_shield(self):
         """
         draw_shield Moves the shield, and draws the shield graphic onto the surface
@@ -72,7 +73,7 @@ class Shield:
                 vert_d = [point_dx, point_dy]
                 point_d = ((x*self.shield_block_size_x),(y*self.shield_block_size_y))
                 #-----
-                _rectname = str(x)+"|"+str(y)
+                _rectname = str(x)+"|"+str(y)  # Unique name of objects - used during debugging
                 # Create right triangle with 90 degree angle in lower right
                 if self.shield_layout[y][x]==1:
                     # Draw the current block onto the surface
@@ -140,12 +141,17 @@ class Shield:
     def _move_shield(self):
         """
         _move_shield Moves the shield and corrects the direction of movement when screen limits are reached
-        """        
+        """     
+        # Check if shield starting y-coordinate is off the top of the screen
+        # If so change the direction the shield is traveling   
         if self.shield_screen_y_location<=0:
             self.shield_direction = 1
+        # Check if shield starting y-coordinate puts the shield off the bottom of the screen
+        # If so change the direction the shield is traveling   
         if self.shield_screen_y_location>=self.shield_screen_max_y:
             self.shield_direction = -1
-        self.shield_screen_y_location = self.shield_screen_y_location + (8 * self.shield_direction)
+        # Calculate the new shield starting Y-coordinate on the screen 
+        self.shield_screen_y_location = self.shield_screen_y_location + (self.shield_block_size_y * self.shield_direction)
 
     def get_shield_center_coordinate(self):
         """
@@ -154,7 +160,7 @@ class Shield:
         :return: y-coordinate of the center of the shield
         :rtype: int
         """        
-        return self.get_shield_screen_y()+35
+        return self.get_shield_screen_y()+35   # Offset the center to account for visuals
 
     def check_shield_collision(self, object_screen_x, object_screen_y):
         """
@@ -188,6 +194,16 @@ class Shield:
         return collision_occurred
 
     def check_cannon_collision(self, object_screen_x, object_screen_y):
+        """
+        check_cannon_collision Check if the Zorlon cannon impacted the shield
+
+        :param object_screen_x: Zorlon Cannon x-coordinate
+        :type object_screen_x: int
+        :param object_screen_y: Zorlon Cannon y-coordinate
+        :type object_screen_y: Int
+        :return: Boolean flag indicating if the cannon has hit the shield
+        :rtype: bool
+        """        
         collision_occurred = False
         # Load 2 points in to account for the height of the cannon 
         check_points = [(object_screen_x+8, object_screen_y),(object_screen_x+9, object_screen_y+4)]
