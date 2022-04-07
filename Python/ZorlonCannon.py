@@ -1,4 +1,5 @@
 import pygame
+from Yar import Yar
 
 class ZorlonCannon(pygame.sprite.Sprite):
     """
@@ -33,16 +34,16 @@ class ZorlonCannon(pygame.sprite.Sprite):
             self.move_right()
         self.rect = pygame.Rect(self.screen_x, self.screen_y, self._cannon_width, self._cannon_height)
 
-    def set_cannon_y_position(self,y):
+    def set_cannon_y_position(self,yar:Yar):
         """
         set_cannon_y_position Sets the current y-coordinate of the cannon on the screen, if not fired
 
-        :param y: Should contain Yar's y-Coordinate
-        :type y: int
+        :param yar: The Yar class representing the player
+        :type yar: Yar
         """        
         # If the cannon was not shot keep it in line with Yar
         if self._currently_fired==False:
-            self.screen_y = y
+            self.screen_y = yar.screen_y
 
     def move_right(self):
         """

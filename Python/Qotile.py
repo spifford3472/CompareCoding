@@ -1,6 +1,8 @@
 import pygame
 from random import seed
 from random import randint
+from Yar import Yar
+from Shield import Shield
 
 class Qotile(pygame.sprite.Sprite):
     """
@@ -36,21 +38,19 @@ class Qotile(pygame.sprite.Sprite):
         self._swirl_countdown = 100                 # Number of screen updates to keep Swirl behind the shield before launching
         self.rect = pygame.Rect(self.screen_x, self.screen_y, self._qotile_width, self._qotile_height)
 
-    def swirl_fire(self, yar_x:int, yar_y:int):
+    def swirl_fire(self, yar:Yar):
         """
         swirl_fire Controls the Swirl action on the screen
 
-        :param yar_x: Yar's current x-coordinate on the screen
-        :type yar_x: int
-        :param yar_y: Yar's current y-coordinate on the screen
-        :type yar_y: int
-        """   
+        :param yar: The Yar class representing the player
+        :type yar: Yar
+        """  
         if self._swirl_active != True: return  # Check if Swirl is active, if not then skip
         if self._swirl_countdown != 0:      # Check if the Swirl launch count down has reached zero
             self._swirl_countdown -= 1
         else:                               # Countdown has reached or is already at zero
             # Calculate simple trajectory toward Yar by only moving the y-coordinate towards Yar
-            if yar_y < self.screen_y:
+            if yar.screen_y < self.screen_y:
                 self.screen_y -= 3
             else:
                 self.screen_y += 3
@@ -95,19 +95,21 @@ class Qotile(pygame.sprite.Sprite):
         self.image = self._images[self._index]          # Set the current image to display
         self.rect = pygame.Rect(self.screen_x, self.screen_y, self._qotile_width, self._qotile_height)
     
-    def set_qotile_y_position(self,y: int,yar_x: int,yar_y: int):
+    def set_qotile_y_position(self,shield: Shield,yar: Yar):
         """
         set_qotile_y_position Sets Qotile's position on the screen, when acting as Qotile
 
-        :param y: The y-coordinate of the screen to place Qotile at
-        :type y: int
-        """   
+        :param shield: The Shield class representing the shield
+        :type shield: Shield
+        :param yar: The Yar class representing the player
+        :type yar: Yar
+        """
         # If Qotile is active set the y-coordinate from the main game loop (match the center of the shield)
         if self._swirl_active==False:     
-            self.screen_y = y
+            self.screen_y = shield.get_shield_center_coordinate()
         else: # Swirl is active so keep in center of shield till countdown reaches zero
             if self._swirl_countdown==0:
-                self.swirl_fire(yar_x, yar_y)
+                self.swirl_fire(yar)
             else:
-                self.screen_y = y
+                self.screen_y = shield.get_shield_center_coordinate()
                 self._swirl_countdown -= 1

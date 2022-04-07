@@ -137,10 +137,10 @@ while 1:
             #   Note: the Zorlon cannon stays aligned with Yar
             if y_movement < -0.01:
                 yar.move_up()
-                cannon.set_cannon_y_position(yar.screen_y)
+                cannon.set_cannon_y_position(yar)
             if y_movement > 0.01:
                 yar.move_down()
-                cannon.set_cannon_y_position(yar.screen_y)
+                cannon.set_cannon_y_position(yar)
 
         # Check Yar collision with shield
         collision=qotile_shield.check_shield_collision(yar.screen_x+23, yar.screen_y)  # fix x location of yar for shield collision
@@ -195,7 +195,7 @@ while 1:
     screen.blit(neutralzone.get_neutral_zone(), (170,0))
 
     # Move Qotile and check if animation or movement needed for the Swirl
-    qotile.set_qotile_y_position(qotile_shield.get_shield_center_coordinate(),yar.screen_x,yar.screen_y)
+    qotile.set_qotile_y_position(qotile_shield, yar)
     qotile_animation.update()
     qotile_animation.draw(screen)
 
@@ -208,8 +208,7 @@ while 1:
     cannon_animation.draw(screen)
 
     # Move and update the Guided Missile
-    missle.set_yars_position(yar.screen_x, yar.screen_y,yar.get_neutral_zone_flag())
-    missle.update()
+    missle.update(yar)
     missle_animation.draw(screen)
 
     # Redraw the screen
