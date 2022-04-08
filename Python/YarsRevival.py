@@ -9,7 +9,6 @@ from GuidedMissle import GuidedMissle       # Custom class used to represent the
 from random import randint                  # Used to create random numbers for colors
 
 
-
 fps = 15                                    # frames per second for the screen
 size = width, height = 300, 200             # Size of the screen
 black = (0, 0, 0)                           # RGB color for black game screen
@@ -17,6 +16,7 @@ green = (0, 255, 0)                         # RGB color for Text font
 blue = (0, 0, 255)                          # RGB color for text background
 bounce_yar=False                            # Signal to bounce Yar away from the shield after nibbling a section
 bounce_yar_start = 0                        # Used to track how far to bounce Yar away from the shield
+
 
 def GameOver(msg:str):
     """
@@ -109,6 +109,7 @@ while 1:
 
     #-----------------------------------------------------------------
     # Check if Yar nibbled some of the shield and needs to be bounced
+    # NOTE: Possible improvement is pushing bounce code into a class
     #-----------------------------------------------------------------
     if bounce_yar==False:
         # Yar did not nibble the shield, so let's check game events
@@ -137,10 +138,8 @@ while 1:
             #   Note: the Zorlon cannon stays aligned with Yar
             if y_movement < -0.01:
                 yar.move_up()
-                cannon.set_cannon_y_position(yar.screen_y)
             if y_movement > 0.01:
                 yar.move_down()
-                cannon.set_cannon_y_position(yar.screen_y)
 
         # Check Yar collision with shield
         collision=qotile_shield.check_shield_collision(yar.screen_x+23, yar.screen_y)  # fix x location of yar for shield collision
@@ -157,11 +156,14 @@ while 1:
         else:
             bounce_yar = False  # Done with the bounce for Yar
 
-    #-----------------------------------------------------------------
+    #-------------------------------------------------------------------
     # Check for collision events between the game objects
-    #-----------------------------------------------------------------
+    # NOTE: Should collision code occur in an actor class
+    # NOTE: Should there be a GameStatus class to track if game is over?
+    #-------------------------------------------------------------------
     # Check if the Zorlon Cannon hit the Shield
-    cannon_shield_collision=qotile_shield.check_cannon_collision(cannon.screen_x, cannon.screen_y)  
+    # TODO: Fix bug as sometimes shield hit is missed
+    cannon_shield_collision=qotile_shield.check_cannon_collision(cannon)  
     if cannon_shield_collision == True:
         cannon.cannon_hit_shield()
 
@@ -195,7 +197,7 @@ while 1:
     screen.blit(neutralzone.get_neutral_zone(), (170,0))
 
     # Move Qotile and check if animation or movement needed for the Swirl
-    qotile.set_qotile_y_position(qotile_shield.get_shield_center_coordinate(),yar.screen_x,yar.screen_y)
+    qotile.set_qotile_y_position(qotile_shield, yar)
     qotile_animation.update()
     qotile_animation.draw(screen)
 
@@ -204,12 +206,11 @@ while 1:
     yar_animation.draw(screen)
 
     # Move and update the Zorlon Cannon
-    cannon.update()
+    cannon.update(yar)
     cannon_animation.draw(screen)
 
     # Move and update the Guided Missile
-    missle.set_yars_position(yar.screen_x, yar.screen_y,yar.get_neutral_zone_flag())
-    missle.update()
+    missle.update(yar)
     missle_animation.draw(screen)
 
     # Redraw the screen
