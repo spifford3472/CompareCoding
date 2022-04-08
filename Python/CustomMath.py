@@ -22,11 +22,11 @@ class CustomMath:
         :param vertices: Contains a list of points in the form (x,y) that form the verticies of a polygon
         :type vertices: list
         """    
-        self._polygon_verticies = vertices
+        self._polygon_verticies = vertices      # Passed in verticies (PRIVATE)
 
     def _is_P_InSegment_P0P1(self,P, P0,P1):
         """
-        _is_P_InSegment_P0P1 Determine if point is in the current polygon segment
+        _is_P_InSegment_P0P1 Determine if point is in the current polygon segment (PRIVATE)
 
         :param P: Point to check
         :type P: tuple
@@ -45,7 +45,7 @@ class CustomMath:
 
     def isInsidePolygon(self, P: tuple, validBorder=False) -> bool:
         """
-        isInsidePolygon Determines if a point is inside a polygon
+        isInsidePolygon Determines if a point is inside a polygon (PUBLIC)
 
         :param P: Point to check against the polygon
         :type P: tuple
@@ -59,6 +59,7 @@ class CustomMath:
             v0, v1 = self._polygon_verticies[i-1] , self._polygon_verticies[i%len(self._polygon_verticies)]
             if self._is_P_InSegment_P0P1(P,v0,v1):
                 return validBorder
+            # cmath library used here in order to deal with complex numbers (python math doesn't handle complex numbers)
             sum_ += cmath.log( (complex(*v1) - complex(*P)) / (complex(*v0) - complex(*P)) )
         return abs(sum_) > 1
 

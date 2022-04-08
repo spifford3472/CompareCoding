@@ -109,6 +109,7 @@ while 1:
 
     #-----------------------------------------------------------------
     # Check if Yar nibbled some of the shield and needs to be bounced
+    # NOTE: Possible improvement is pushing bounce code into a class
     #-----------------------------------------------------------------
     if bounce_yar==False:
         # Yar did not nibble the shield, so let's check game events
@@ -137,10 +138,8 @@ while 1:
             #   Note: the Zorlon cannon stays aligned with Yar
             if y_movement < -0.01:
                 yar.move_up()
-                cannon.set_cannon_y_position(yar)
             if y_movement > 0.01:
                 yar.move_down()
-                cannon.set_cannon_y_position(yar)
 
         # Check Yar collision with shield
         collision=qotile_shield.check_shield_collision(yar.screen_x+23, yar.screen_y)  # fix x location of yar for shield collision
@@ -157,11 +156,14 @@ while 1:
         else:
             bounce_yar = False  # Done with the bounce for Yar
 
-    #-----------------------------------------------------------------
+    #-------------------------------------------------------------------
     # Check for collision events between the game objects
-    #-----------------------------------------------------------------
+    # NOTE: Should collision code occur in an actor class
+    # NOTE: Should there be a GameStatus class to track if game is over?
+    #-------------------------------------------------------------------
     # Check if the Zorlon Cannon hit the Shield
-    cannon_shield_collision=qotile_shield.check_cannon_collision(cannon.screen_x, cannon.screen_y)  
+    # TODO: Fix bug as sometimes shield hit is missed
+    cannon_shield_collision=qotile_shield.check_cannon_collision(cannon)  
     if cannon_shield_collision == True:
         cannon.cannon_hit_shield()
 
@@ -204,7 +206,7 @@ while 1:
     yar_animation.draw(screen)
 
     # Move and update the Zorlon Cannon
-    cannon.update()
+    cannon.update(yar)
     cannon_animation.draw(screen)
 
     # Move and update the Guided Missile
