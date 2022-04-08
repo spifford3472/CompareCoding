@@ -50,12 +50,17 @@ First I’ll discuss the Commodore 64 computer then I’ll discuss my current ho
   - Windows 11 Pro v 10.0.22000
  
  **Development Environments**
- - Commodore 64
-  -- Development OS: Windows 11
-  - Development IDE: Visual Studio Code v1.65.2
-  - Cross Compiler: ACME Compiler v0.97
-  - Commodore 64 Emulator: VICE - GTK3 v4.6.1-Win64
-  - Commodore 64 Debugger: C64 Debugger v0.64.56
-  - Sprite Editor: Sprite Pad v2.0 Beta 1 (Used to replace graph paper and manual hex calculations)
+ - Commodore 64 Development Tools
+    - Development OS: Windows 11
+    - Development IDE: Visual Studio Code v1.65.2
+    - Cross Compiler: ACME Compiler v0.97
+    - Commodore 64 Emulator: VICE - GTK3 v4.6.1-Win64
+    - Commodore 64 Debugger: C64 Debugger v0.64.56
+    - Sprite Editor: Sprite Pad v2.0 Beta 1 (Used to replace graph paper and manual hex calculations)
+ - Python Development Environment
+    - Development OS: Windows 11
+    - Development IDE: Visual Studio Code v1.65.2
+    - Python Version: 3.9.12
+    - Graphic Editor: GIMP 2.10  (Captured Commodore 64 sprites and converted to PNG)
  
-- 
+ 
