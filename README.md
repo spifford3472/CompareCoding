@@ -51,7 +51,7 @@ First I’ll discuss the Commodore 64 computer then I’ll discuss my current ho
  
  **Development Environments**
  - Commodore 64
-  - Development OS: Windows 11
+  -- Development OS: Windows 11
   - Development IDE: Visual Studio Code v1.65.2
   - Cross Compiler: ACME Compiler v0.97
   - Commodore 64 Emulator: VICE - GTK3 v4.6.1-Win64
